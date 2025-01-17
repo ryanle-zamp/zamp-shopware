@@ -787,7 +787,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 										this.retainLogs = false;
 									}
 								});
-								this.retainLogsEventsAdded = true; // Ensure listeners are only added once
+								this.retainLogsEventAdded = true; // Ensure listeners are only added once
 							} 
 						} 
 
