@@ -1,0 +1,279 @@
+<div class="zamp-tax-main-page">
+	<div class="zamp-page">
+		<div class="zamp-page__body">
+			<header class="zamp-page__head-area">
+				<div class="zamp-page__smart-bar">
+					<div class="zamp-navigation">
+						<a href="#/sw/extension/my-extensions/listing/app?limit=25&amp;page=1" class="zamp-navigation__link">
+							&#x2B05; &emsp; Back</a>
+					</div>
+					<div class="zamp-content">
+						<div class="zamp-page__module-info">
+							<div class="zamp-page__module-icon">
+								<div class="zamp-extension-icon">
+									<img class="zamp-extension-icon__icon" :src="assetFilter('/zamptax/Zamp-Logo.png')" alt="Zamp Logo" width="180">
+								</div>
+							</div>
+						</div>
+						<div class="zamp-page__actions">
+							<p class="zamp-contact-text" id="prompt-text">Need Account?</p>
+							<a class="zamp-button button-link" id="contact-button" target="_blank" href="https://zamp.com/platforms/shopware">Create Account</a>
+						</div>
+					</div>
+				</div>
+			</header>
+
+			<main class="zamp-page__content">
+				<div class="zamp-api">
+					<div class="zamp-card-wrapper">
+						<div></div>
+						<div class="zamp-api__card">
+							{% block zamp_tabs %}
+
+								<sw-tabs
+									class="zamp-tabs"
+									position-identifier="zamp-tax">
+				
+									{% block zamp_tabs_settings %}
+										<sw-tabs-item
+										:active="activeTab === 'settings'"
+										name="settings"
+										class="zamp-tabs__tab-settings"
+										@click="onTabChange('settings')"
+										>
+											Zamp Settings
+										</sw-tabs-item>						
+									{% endblock %}
+				
+									{% block zamp_tabs_historical_sync %}
+										<sw-tabs-item
+										:active="activeTab === 'historicalSync'"
+										name="historicalSync"
+										class="zamp-tabs__tab-historical-sync"
+										@click="onTabChange('historicalSync')"
+										>
+											Historical Sync
+										</sw-tabs-item>						
+									{% endblock %}
+				
+									{% block zamp_tabs_error_logs %}
+										<sw-tabs-item
+										:active="activeTab === 'errorLogs'"
+										name="errorLogs"
+										class="zamp-tabs__tab-error-logs"
+										@click="onTabChange('errorLogs')"
+										>
+											Logs
+										</sw-tabs-item>						
+									{% endblock %}
+								</sw-tabs>
+							{% endblock %}
+
+							{% block zamp_settings_form %}
+							<template
+							v-if="activeTab === 'settings'">
+								<div class="zamp-api__card__header">
+									<div class="zamp-api__card__titles">
+										<div class="zamp-api__card__title">Zamp Tax Settings</div>
+									</div>
+								</div>
+								<div class="gray-divide"></div>
+								<div class="zamp-api__card__content">
+									<form action="" id="zamp-token-form">
+										<div class="zamp-api-input-wrapper">
+											<div class="zamp-field" label="Zamp API Token">
+												<div class="zamp-field-label">
+													<label for="zamp-token-input">Zamp API Token</label>
+												</div>
+												<div class="zamp-field-input">
+													<input type="password" placeholder="Enter Zamp API Token" maxlength="64" id="zamp-token-input" autocomplete="off">
+												</div>
+											</div>
+										</div>
+										<div class="zamp-button-wrapper">
+											<button id="token-button" type="submit" class="zamp-button">Connect Zamp Account</button>
+										</div>
+										<small id="small-disclaimer-text">In order to use the Zamp Tax Provider Plugin, you will need your Zamp account's API token. This value will be provided to you during onboarding with us! If you don't yet have an API token, please reach out to us by clicking the button in the top right.</small>
+									</form>
+
+								</div>
+								<div class="gray-divide"></div>
+								<div class="zamp-api__card__content">
+									<form action="" id="zamp-settings-form">
+										<div class="zamp-state-input-wrapper">
+											<div class="zamp-field" label="Taxable States">
+												<div class="zamp-select-input">
+													<sw-multi-select
+														v-model="selectedStates"
+														:options="stateOptions"
+														labelProperty="name"
+														valueProperty="code"
+														placeholder="Choose States"
+														:searchable="true"
+														:multiple="true"
+													></sw-multi-select>
+												</div>
+											</div>
+										</div>
+										<div class="zamp-calc-input-wrapper">
+											<div class="zamp-field" label="Allow Zamp to handle your Tax Calculations?">
+												<div id="zamp-calc-input" class="zamp-calc-input">
+													<sw-switch-field
+														v-model="calcEnabled"
+														label="Allow Zamp to handle your Tax Calculations?"
+													></sw-switch-field>
+												</div>
+											</div>
+										</div>
+										<div class="zamp-trans-input-wrapper">
+											<div class="zamp-field" label="Send your transaction reports to Zamp?">
+												<div id="zamp-trans-input" class="zamp-trans-input">
+													<sw-switch-field
+														v-model="transEnabled"
+														label="Send your transaction reports to Zamp?"
+													></sw-switch-field>
+												</div>
+											</div>
+										</div>
+
+                                        <div class="zamp-retain-input-wrapper">
+											<div class="zamp-field" label="Compress and Retain Zamp logs after 30 days?">
+												<div id="zamp-retain-input" class="zamp-retain-input">
+													<sw-switch-field
+														v-model="retainLogs"
+														label="Compress and Retain Zamp logs after 30 days?"
+													></sw-switch-field>
+												</div>
+											</div>
+										</div>
+
+										<div class="zamp-button-wrapper">
+											<button id="config-button" type="submit" class="zamp-button">Save Settings</button>
+											</div>
+										
+									</form>
+
+								</div>
+								<div class="gray-divide-last"></div>
+							</template>	
+							{% endblock %}
+
+							{% block zamp_historical_sync_form %}
+								<template
+								v-if="activeTab === 'historicalSync'">
+									<div class="zamp-api__card__header">
+										<div class="zamp-api__card__titles">
+											<div class="zamp-api__card__title">Historical Data Sync</div>
+										</div>
+									</div>
+									<div class="gray-divide"></div>
+									<div class="zamp-api__card__content">
+										<form action="" id="historical-data-form" style="display: grid; grid-template-columns: 50% 1fr; grid-template-rows: auto auto; grid-column-gap: 16px; grid-template-areas: 'input input''button context';">
+											<div class="zamp-sync-input-wrapper">
+												<div class="zamp-field" label="Start Date">
+													<div class="zamp-field-label">
+														<label for="zamp-sync-start-input">Start Date</label>
+													</div>
+													<div class="zamp-field-input">
+														<input style="outline: none; border: 0px; padding: 6px; width: 100%;" type="date" id="zamp-sync-start-input" min="2022-01-01" autocomplete="off">
+													</div>
+												</div>
+											</div>
+											<div class="zamp-sync-input-wrapper">
+												<div class="zamp-field" label="End Date">
+													<div class="zamp-field-label">
+														<label for="zamp-sync-end-input">End Date</label>
+													</div>
+													<div class="zamp-field-input">
+														<input style="outline: none;  border: 0px; padding: 6px; width: 100%;" type="date" id="zamp-sync-end-input" min="2022-01-01" autocomplete="off">
+													</div>
+												</div>
+											</div>
+											<div class="zamp-button-wrapper">
+												<button id="sync-button" type="submit" class="zamp-button">Sync Historical Transactions</button>
+												<small id="small-warning-text"></small>
+											</div>
+										</form>										
+	
+									</div>
+									<div class="gray-divide"></div>
+									<div class="zamp-api__card__content">
+										<sw-data-grid
+											:showSelection="false"
+											:showActions="false"
+											:dataSource="[
+												{ id: 'syncRequested', status: 'Requested', count: totalSyncRequested },
+												{ id: 'syncRequested', status: 'Completed', count: totalSyncCompleted },
+												{ id: 'syncExists', status: 'Already Exists', count: totalSyncExists },
+												{ id: 'syncUpdated', status: 'Updated', count: totalSyncUpdated },
+												{ id: 'syncRequested', status: 'Failed', count: totalSyncFailed }
+												
+											]"
+
+											:columns="[
+												{ property: 'status', label: 'Status'},
+												{ property: 'count', label: 'Count' }
+											]">
+										</sw-data-grid>
+									</div>
+									<div class="gray-divide-last"></div>
+								</template>
+
+							{% endblock %}
+
+                            {% block zamp_logs_form %}
+								<template
+								v-if="activeTab === 'errorLogs'">
+									<div class="zamp-api__card__header">
+										<div class="zamp-api__card__titles">
+											<div class="zamp-api__card__title">Logs</div>
+										</div>
+									</div>
+									<div class="gray-divide"></div>
+									<div class="zamp-api__card__content">
+										<form action="" id="zamp-logs-form" style="display: grid; grid-template-columns: 50% 1fr; grid-template-rows: auto auto; grid-column-gap: 16px; grid-template-areas: 'input input' 'button button';">
+											<div class="zamp-logs-input-wrapper">
+												<div class="zamp-field" label="Date">
+													<div class="zamp-field-label">
+														<label for="zamp-logs-date-input">Date</label>
+													</div>
+													<div class="zamp-field-input">
+														<input style="outline: none; border: 0px; padding: 6px; width: 100%;" type="date" id="zamp-logs-date-input" min="2022-01-01">
+													</div>
+												</div>
+											</div>
+											<div class="zamp-logs-input-wrapper">
+
+											</div>
+											<div class="zamp-button-wrapper">
+												<button id="logs-button" type="submit" class="zamp-button">Get Logs</button>
+												<small id="small-logs-text"></small>
+											</div>
+                                            <div class="zamp-button-wrapper">
+                                                <button id="logs-down-button" type="button" class="zamp-button">Download Logs as PDF</button>
+                                                <pre style="display: none; width: 0px; height: 0px;" id="small-logs-down-text"></pre>
+                                            </div>
+											
+										</form>										
+                                        
+									</div>
+
+                                    <hr/>
+
+									<div class="zamp-api__card__content" id="logs-ui">
+										
+									</div>
+                                    
+									<div class="gray-divide-last"></div>
+								</template>
+
+							{% endblock %}
+													
+						</div>
+						<div></div>
+					</div>
+				</div>
+			</main>
+		</div>
+	</div>
+</div>

@@ -1,0 +1,63 @@
+<?xml version="1.0" ?>
+
+<container xmlns="http://symfony.com/schema/dic/services"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+
+    <services>
+
+        <service id="ZampTax\Core\Content\ZampSettings\ZampSettingsDefinition">
+            <tag name="shopware.entity.definition" entity="zamp_settings"/>
+        </service>
+
+        <service id="ZampTax\Core\Content\ZampProductTaxCode\ZampProductTaxCodeDefinition">
+            <tag name="shopware.entity.definition" entity="zamp_product_tax_code"/>
+        </service>
+
+        <service id="ZampTax\Core\Content\ZampTransactions\ZampTransactionsDefinition">
+            <tag name="shopware.entity.definition" entity="zamp_transactions"/>
+        </service>
+
+        <service id="ZampTax\Service\ZampSettingsService">
+            <argument type="service" id="zamp_settings.repository"/>
+        </service>
+
+        <service id="ZampTax\Service\ZampProductTaxCodeService">
+            <argument type="service" id="zamp_product_tax_code.repository"/>
+        </service>
+
+        <service id="ZampTax\Service\ZampTransactionsService">
+            <argument type="service" id="zamp_transactions.repository"/>
+        </service>
+
+		<service id="ZampTax\Core\Api\ZampController" public="true">
+            <call method="setContainer">
+                <argument type="service" id="service_container"/>
+            </call>
+            <argument type="service" id="Doctrine\DBAL\Connection" />
+            <argument type="service" id="order.repository" />
+            <argument type="service" id="order_transaction.repository"/>            
+            <argument type="service" id="zamp_transactions.repository" />
+        </service>
+
+        <service id="ZampTax\Checkout\Cart\Tax\ZampTax">
+            <argument type="service" id="Doctrine\DBAL\Connection" />
+			<argument type="service" id="Shopware\Core\System\Snippet\SnippetService" />
+            <tag name="shopware.tax.provider"/>
+        </service>
+
+		<service id="ZampTax\Subscriber\ZampEventSubscriber">
+			<argument type="service" id="Doctrine\DBAL\Connection" />
+		 	<argument type="service" id="order.repository"/>
+            <argument type="service" id="order_transaction.repository"/>            
+			<argument type="service" id="zamp_transactions.repository" />
+            <argument type="service" id="tax_provider.repository" />
+            <tag name="kernel.event_subscriber" event="checkout.order.placed"/>
+			<tag name="kernel.event_subscriber" event="order.deleted"/>
+        </service>
+
+		
+
+		 
+    </services>
+</container>

@@ -1,0 +1,22 @@
+{% extends '@Administration/module/sw-product/view/sw-product-detail-base/sw-product-detail-base.html.twig' %}
+
+	{% block sw_product_detail_base %}
+		{% parent %}
+		
+		<sw-card
+			:is-loading="isLoading"
+			title="Zamp Product Tax Code"
+			position-identifier="sw-product-detail-zamp-tax-code"
+		>
+			<sw-container>
+				<sw-text-field
+                    id="zamp-product-tax-code-input"
+					v-model:value="zampProductTaxCode"
+					label="Zamp Product Tax Code"
+					class="sw-zamp-product-tax-code"
+					placeholder="Enter Zamp Product Tax code"
+				/>
+			</sw-container>
+		</sw-card>
+	
+	{% endblock %}

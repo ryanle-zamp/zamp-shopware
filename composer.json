@@ -1,0 +1,27 @@
+{
+    "name": "zamp-tax/zamp-tax",
+    "description": "zamp-tax/zamp-tax",
+    "type": "shopware-platform-plugin",
+    "version": "1.0.1",
+    "license": "proprietary",
+    "require": {
+        "shopware/core": "6.*"
+    },
+    "extra": {
+        "shopware-plugin-class": "ZampTax\\ZampTax",
+        "label": {
+            "de-DE": "Zamp Tax",
+            "en-GB": "Zamp Tax"
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "ZampTax\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ZampTax\\Tests\\": "tests/"
+        }
+    }
+}
