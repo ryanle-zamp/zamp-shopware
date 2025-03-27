@@ -13,6 +13,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 	data: function() {
 		return {
 			activeTab: 'settings',
+			connected: false,
 			entityId: '',
 			entity: undefined,
             paidEntity: undefined,
@@ -127,12 +128,8 @@ Shopware.Component.register('zamp-tax-main-page', {
 				if(this.entity.apiToken !== null){
 
 					document.querySelector('#zamp-token-input').value = this.entity.apiToken;
-					document.querySelector('#prompt-text').innerText = 'Have Questions?';
-					document.querySelector('#contact-button').innerText = 'Contact Us';
-					document.querySelector('#small-disclaimer-text').innerText = 'Connected!';
 					document.querySelector('#small-disclaimer-text').classList.add('green-text');
-					document.querySelector('#token-button').innerText = 'Update API Token';
-
+					this.connected = true;
 				}
 
 				if(this.entity.taxableStates !== null){
@@ -204,11 +201,8 @@ Shopware.Component.register('zamp-tax-main-page', {
 							if(this.entity.apiToken !== null){
 
 								document.querySelector('#zamp-token-input').value = this.entity.apiToken;
-								document.querySelector('#prompt-text').innerText = 'Have Questions?';
-								document.querySelector('#contact-button').innerText = 'Contact Us';
-								document.querySelector('#small-disclaimer-text').innerText = 'Connected!';
 								document.querySelector('#small-disclaimer-text').classList.add('green-text');
-								document.querySelector('#token-button').innerText = 'Update API Token';
+								this.connected = true;
 
 							}
 
@@ -313,8 +307,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 
             e.preventDefault(e);
 
-            console.log("Download Button Pressed.");
-
             const { jsPDF } = window.jspdf;
 
             const log_doc = new jsPDF();
@@ -332,7 +324,7 @@ Shopware.Component.register('zamp-tax-main-page', {
             console.log(selectedDate);
 
             if(!selectedDate){
-                logsUI.textContent = "Please select a date";
+                logsUI.textContent = this.$tc('messages.date');
                 return;
             }
 
@@ -346,7 +338,7 @@ Shopware.Component.register('zamp-tax-main-page', {
                 }
                 return response.text();
             }).then(text => {
-                    logsUI.textContent = "Log Download Initiated";
+                    logsUI.textContent = this.$tc('messages.init');
 
                     const titleFontSize = 16;
 
@@ -383,7 +375,7 @@ Shopware.Component.register('zamp-tax-main-page', {
                     log_doc.save(`Zamp-Shopware-log-${selectedDate}.pdf`);
 
             }).catch(error => {
-                logsUI.textContent = "File not found for the selected date.";
+                logsUI.textContent = this.$tc('errors.log');
                 console.error('Error fetching file content: ', error);
             });
 
@@ -402,7 +394,7 @@ Shopware.Component.register('zamp-tax-main-page', {
             console.log(selectedDate);
 
             if(!selectedDate){
-                logsUI.textContent = "Please select a date";
+                logsUI.textContent = this.$tc('messages.date');
                 return;
             }
 
@@ -418,7 +410,7 @@ Shopware.Component.register('zamp-tax-main-page', {
             }).then(text => {
                     logsUI.innerHTML = `<pre>${text}</pre>`;
             }).catch(error => {
-                logsUI.textContent = "File not found for the selected date.";
+                logsUI.textContent = this.$tc('errors.log');
                 console.error('Error fetching file content: ', error);
             });
         },
@@ -577,7 +569,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 
 				} else {
-					document.querySelector('#small-warning-text').innerText = 'In order to use Historical Sync fetaure you will need to first connect your Zamp account in the Zamp Settings tab.';
+					document.querySelector('#small-warning-text').innerText = this.$tc('messages.syncwarn');
 				}
 			});
 
@@ -604,9 +596,10 @@ Shopware.Component.register('zamp-tax-main-page', {
 				if(resp.valid){
 					this.createNotificationSuccess({
 						title: this.$tc('global.default.success'),
-						message: this.$tc('The operation was successful. Token Validated.')
+						message: this.$tc('messages.successtoken')
 					});
 					this.entity.apiToken = token;
+					this.connected = true;
 
 					this.zampSettingsRepository.save(this.entity, Shopware.Context.api)
 					.then(() => {
@@ -618,16 +611,14 @@ Shopware.Component.register('zamp-tax-main-page', {
 							});
 					});
 					document.querySelector('#zamp-token-input').value = this.entity.apiToken;
-					document.querySelector('#prompt-text').innerText = 'Have Questions?';
-					document.querySelector('#contact-button').innerText = 'Contact Us';
-					document.querySelector('#small-disclaimer-text').innerText = 'Connected!';
 					document.querySelector('#small-disclaimer-text').classList.add('green-text');
-					document.querySelector('#token-button').innerText = 'Update API Token';
+					this.connected = true;
 				} else {
 					this.createNotificationError({
 						title: this.$tc('global.notification.unspecifiedSaveErrorMessage'),
-						message: this.$tc('The operation has failed. Token invalid')
+						message: this.$tc('messages.failtoken')
 					});
+					this.connected = false;
 				}
 			});
 
@@ -855,7 +846,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 				// the entity is stateless, the data has be fetched from the server, if required
 				this.createNotificationSuccess({
 					title: this.$tc('global.default.success'),
-					message: this.$tc('The operation was successful. Zamp Settings Saved.')
+					message: this.$tc('messages.success')
 				});
 				this.zampSettingsRepository
 					.get(this.entityId, Shopware.Context.api)
@@ -865,7 +856,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 			}).catch((err) => {
 				this.createNotificationError({
 					title: this.$tc('global.notification.unspecifiedSaveErrorMessage'),
-					message: this.$tc('The operation has failed. ' + err.message)
+					message: this.$tc('messages.fail') + err.message
 				});
 			});
 		}

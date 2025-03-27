@@ -5,7 +5,7 @@
 				<div class="zamp-page__smart-bar">
 					<div class="zamp-navigation">
 						<a href="#/sw/extension/my-extensions/listing/app?limit=25&amp;page=1" class="zamp-navigation__link">
-							&#x2B05; &emsp; Back</a>
+							&#x2B05; &emsp; {{ $tc('buttons.back') }}</a>
 					</div>
 					<div class="zamp-content">
 						<div class="zamp-page__module-info">
@@ -16,8 +16,8 @@
 							</div>
 						</div>
 						<div class="zamp-page__actions">
-							<p class="zamp-contact-text" id="prompt-text">Need Account?</p>
-							<a class="zamp-button button-link" id="contact-button" target="_blank" href="https://zamp.com/platforms/shopware">Create Account</a>
+							<p class="zamp-contact-text" id="prompt-text">{{ connected ? $tc('labels.quest') : $tc('labels.need') }}</p>
+							<a class="zamp-button button-link" id="contact-button" target="_blank" href="https://zamp.com/platforms/shopware">{{ connected ? $tc('buttons.contact') : $tc('buttons.create') }}</a>
 						</div>
 					</div>
 				</div>
@@ -41,29 +41,31 @@
 										class="zamp-tabs__tab-settings"
 										@click="onTabChange('settings')"
 										>
-											Zamp Settings
+											{{ $tc('tabs.settings') }}
 										</sw-tabs-item>						
 									{% endblock %}
 				
 									{% block zamp_tabs_historical_sync %}
 										<sw-tabs-item
 										:active="activeTab === 'historicalSync'"
+										:disabled="!connected"
 										name="historicalSync"
 										class="zamp-tabs__tab-historical-sync"
 										@click="onTabChange('historicalSync')"
 										>
-											Historical Sync
+										{{ $tc('tabs.historicalSync') }}
 										</sw-tabs-item>						
 									{% endblock %}
 				
 									{% block zamp_tabs_error_logs %}
 										<sw-tabs-item
 										:active="activeTab === 'errorLogs'"
+										:disabled="!connected"
 										name="errorLogs"
 										class="zamp-tabs__tab-error-logs"
 										@click="onTabChange('errorLogs')"
 										>
-											Logs
+										{{ $tc('tabs.errorLogs') }}
 										</sw-tabs-item>						
 									{% endblock %}
 								</sw-tabs>
@@ -74,26 +76,26 @@
 							v-if="activeTab === 'settings'">
 								<div class="zamp-api__card__header">
 									<div class="zamp-api__card__titles">
-										<div class="zamp-api__card__title">Zamp Tax Settings</div>
+										<div class="zamp-api__card__title">{{ $tc('cards.settings') }}</div>
 									</div>
 								</div>
 								<div class="gray-divide"></div>
 								<div class="zamp-api__card__content">
 									<form action="" id="zamp-token-form">
 										<div class="zamp-api-input-wrapper">
-											<div class="zamp-field" label="Zamp API Token">
+											<div class="zamp-field" :label="$tc('labels.token')">
 												<div class="zamp-field-label">
-													<label for="zamp-token-input">Zamp API Token</label>
+													<label for="zamp-token-input">{{ $tc('labels.token') }}</label>
 												</div>
 												<div class="zamp-field-input">
-													<input type="password" placeholder="Enter Zamp API Token" maxlength="64" id="zamp-token-input" autocomplete="off">
+													<input type="password" placeholder="{{ $tc('places.token') }}" maxlength="64" id="zamp-token-input" autocomplete="off">
 												</div>
 											</div>
 										</div>
 										<div class="zamp-button-wrapper">
-											<button id="token-button" type="submit" class="zamp-button">Connect Zamp Account</button>
+											<button id="token-button" type="submit" class="zamp-button">{{ connected ? $tc('buttons.update') : $tc('buttons.connect') }}</button>
 										</div>
-										<small id="small-disclaimer-text">In order to use the Zamp Tax Provider Plugin, you will need your Zamp account's API token. This value will be provided to you during onboarding with us! If you don't yet have an API token, please reach out to us by clicking the button in the top right.</small>
+										<small id="small-disclaimer-text">{{ connected ? $tc('disclaim.connected') : $tc('disclaim.disclaimer') }}</small>
 									</form>
 
 								</div>
@@ -101,55 +103,59 @@
 								<div class="zamp-api__card__content">
 									<form action="" id="zamp-settings-form">
 										<div class="zamp-state-input-wrapper">
-											<div class="zamp-field" label="Taxable States">
+											<div class="zamp-field" :label="$tc('labels.state')">
 												<div class="zamp-select-input">
 													<sw-multi-select
 														v-model="selectedStates"
 														:options="stateOptions"
 														labelProperty="name"
 														valueProperty="code"
-														placeholder="Choose States"
+														:placeholder="$tc('places.states')"
 														:searchable="true"
 														:multiple="true"
+														:disabled="!connected"
 													></sw-multi-select>
 												</div>
 											</div>
 										</div>
 										<div class="zamp-calc-input-wrapper">
-											<div class="zamp-field" label="Allow Zamp to handle your Tax Calculations?">
+											<div class="zamp-field" :label="$tc('switches.allow')">
 												<div id="zamp-calc-input" class="zamp-calc-input">
 													<sw-switch-field
 														v-model="calcEnabled"
-														label="Allow Zamp to handle your Tax Calculations?"
+														:disabled="!connected"
+														:label="$tc('switches.allow')"
 													></sw-switch-field>
 												</div>
 											</div>
 										</div>
 										<div class="zamp-trans-input-wrapper">
-											<div class="zamp-field" label="Send your transaction reports to Zamp?">
+											<div class="zamp-field" :label="$tc('switches.send')">
 												<div id="zamp-trans-input" class="zamp-trans-input">
 													<sw-switch-field
 														v-model="transEnabled"
-														label="Send your transaction reports to Zamp?"
+														:disabled="!connected"
+														:label="$tc('switches.send')"
 													></sw-switch-field>
 												</div>
 											</div>
 										</div>
 
                                         <div class="zamp-retain-input-wrapper">
-											<div class="zamp-field" label="Compress and Retain Zamp logs after 30 days?">
+											<div class="zamp-field" :label="$tc('switches.compress')">
 												<div id="zamp-retain-input" class="zamp-retain-input">
 													<sw-switch-field
 														v-model="retainLogs"
-														label="Compress and Retain Zamp logs after 30 days?"
+														:disabled="!connected"
+														:label="$tc('switches.compress')"
 													></sw-switch-field>
 												</div>
 											</div>
 										</div>
 
 										<div class="zamp-button-wrapper">
-											<button id="config-button" type="submit" class="zamp-button">Save Settings</button>
-											</div>
+											<button id="config-button" type="submit" :disabled="!connected" class="zamp-button">{{ $tc('buttons.save') }}</button>
+										</div>
 										
 									</form>
 
@@ -163,16 +169,16 @@
 								v-if="activeTab === 'historicalSync'">
 									<div class="zamp-api__card__header">
 										<div class="zamp-api__card__titles">
-											<div class="zamp-api__card__title">Historical Data Sync</div>
+											<div class="zamp-api__card__title">{{ $tc('cards.historicalSync') }}</div>
 										</div>
 									</div>
 									<div class="gray-divide"></div>
 									<div class="zamp-api__card__content">
 										<form action="" id="historical-data-form" style="display: grid; grid-template-columns: 50% 1fr; grid-template-rows: auto auto; grid-column-gap: 16px; grid-template-areas: 'input input''button context';">
 											<div class="zamp-sync-input-wrapper">
-												<div class="zamp-field" label="Start Date">
+												<div class="zamp-field" :label="$tc('labels.start')">
 													<div class="zamp-field-label">
-														<label for="zamp-sync-start-input">Start Date</label>
+														<label for="zamp-sync-start-input">{{ $tc('labels.start') }}</label>
 													</div>
 													<div class="zamp-field-input">
 														<input style="outline: none; border: 0px; padding: 6px; width: 100%;" type="date" id="zamp-sync-start-input" min="2022-01-01" autocomplete="off">
@@ -180,9 +186,9 @@
 												</div>
 											</div>
 											<div class="zamp-sync-input-wrapper">
-												<div class="zamp-field" label="End Date">
+												<div class="zamp-field" :label="$tc('labels.end')">
 													<div class="zamp-field-label">
-														<label for="zamp-sync-end-input">End Date</label>
+														<label for="zamp-sync-end-input">{{ $tc('labels.end') }}</label>
 													</div>
 													<div class="zamp-field-input">
 														<input style="outline: none;  border: 0px; padding: 6px; width: 100%;" type="date" id="zamp-sync-end-input" min="2022-01-01" autocomplete="off">
@@ -190,7 +196,7 @@
 												</div>
 											</div>
 											<div class="zamp-button-wrapper">
-												<button id="sync-button" type="submit" class="zamp-button">Sync Historical Transactions</button>
+												<button id="sync-button" type="submit" class="zamp-button">{{ $tc('buttons.sync') }}</button>
 												<small id="small-warning-text"></small>
 											</div>
 										</form>										
@@ -202,17 +208,17 @@
 											:showSelection="false"
 											:showActions="false"
 											:dataSource="[
-												{ id: 'syncRequested', status: 'Requested', count: totalSyncRequested },
-												{ id: 'syncRequested', status: 'Completed', count: totalSyncCompleted },
-												{ id: 'syncExists', status: 'Already Exists', count: totalSyncExists },
-												{ id: 'syncUpdated', status: 'Updated', count: totalSyncUpdated },
-												{ id: 'syncRequested', status: 'Failed', count: totalSyncFailed }
+												{ id: 'syncRequested', status: $tc('status.request'), count: totalSyncRequested },
+												{ id: 'syncRequested', status: $tc('status.complete'), count: totalSyncCompleted },
+												{ id: 'syncExists', status: $tc('status.already'), count: totalSyncExists },
+												{ id: 'syncUpdated', status: $tc('status.update'), count: totalSyncUpdated },
+												{ id: 'syncRequested', status: $tc('status.fail'), count: totalSyncFailed }
 												
 											]"
 
 											:columns="[
-												{ property: 'status', label: 'Status'},
-												{ property: 'count', label: 'Count' }
+												{ property: 'status', label: $tc('status.stat')},
+												{ property: 'count', label: $tc('status.count') }
 											]">
 										</sw-data-grid>
 									</div>
@@ -226,16 +232,16 @@
 								v-if="activeTab === 'errorLogs'">
 									<div class="zamp-api__card__header">
 										<div class="zamp-api__card__titles">
-											<div class="zamp-api__card__title">Logs</div>
+											<div class="zamp-api__card__title">{{ $tc('cards.errorLogs') }}</div>
 										</div>
 									</div>
 									<div class="gray-divide"></div>
 									<div class="zamp-api__card__content">
 										<form action="" id="zamp-logs-form" style="display: grid; grid-template-columns: 50% 1fr; grid-template-rows: auto auto; grid-column-gap: 16px; grid-template-areas: 'input input' 'button button';">
 											<div class="zamp-logs-input-wrapper">
-												<div class="zamp-field" label="Date">
+												<div class="zamp-field" :label="$tc('labels.date')">
 													<div class="zamp-field-label">
-														<label for="zamp-logs-date-input">Date</label>
+														<label for="zamp-logs-date-input">{{ $tc('labels.date') }}</label>
 													</div>
 													<div class="zamp-field-input">
 														<input style="outline: none; border: 0px; padding: 6px; width: 100%;" type="date" id="zamp-logs-date-input" min="2022-01-01">
@@ -246,11 +252,11 @@
 
 											</div>
 											<div class="zamp-button-wrapper">
-												<button id="logs-button" type="submit" class="zamp-button">Get Logs</button>
+												<button id="logs-button" type="submit" class="zamp-button">{{ $tc('buttons.get') }}</button>
 												<small id="small-logs-text"></small>
 											</div>
                                             <div class="zamp-button-wrapper">
-                                                <button id="logs-down-button" type="button" class="zamp-button">Download Logs as PDF</button>
+                                                <button id="logs-down-button" type="button" class="zamp-button">{{ $tc('buttons.down') }}</button>
                                                 <pre style="display: none; width: 0px; height: 0px;" id="small-logs-down-text"></pre>
                                             </div>
 											
