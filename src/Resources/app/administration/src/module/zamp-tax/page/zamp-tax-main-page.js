@@ -1,8 +1,6 @@
 import template from './zamp-tax-main-page.html.twig';
 import './zamp-tax-main-page.scss';
 
-const bear = 'e402ac655d761097e5935096013ee099d4ac28bd42225ccb829e10abf99dc16c';
-
 Shopware.Component.register('zamp-tax-main-page', {
 	template,
 
