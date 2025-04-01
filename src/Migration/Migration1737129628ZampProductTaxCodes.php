@@ -36,6 +36,6 @@ SQL;
 
     public function updateDestructive(Connection $connection): void
     {
-        // Destructive changes go here
+
     }
 }
