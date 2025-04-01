@@ -158,19 +158,9 @@ class ZampTax extends Plugin
             ');
         }
 
-        $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0;');
-
-        $tables = [
-            'zamp_transactions',
-            'zamp_settings',
-            'zamp_product_tax_code'
-        ];
-
-        foreach($tables as $table){
-            $connection->executeStatement("DROP TABLE IF EXISTS `$table`");
-        }
-
-        $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1;');
+        $connection->executeStatement("DROP TABLE IF EXISTS `zamp_transactions`");
+        $connection->executeStatement("DROP TABLE IF EXISTS `zamp_product_tax_code`");
+        $connection->executeStatement("DROP TABLE IF EXISTS `zamp_settings`");
     }
 
     /**
