@@ -1,0 +1,66 @@
+{
+    "tabs": {
+        "settings": "Zamp Einstellungen",
+        "historicalSync": "Historische Synchronisierung",
+        "errorLogs": "Protokolle"
+    },
+    "cards": {
+        "settings": "Zamp Steuer-Einstellungen",
+        "historicalSync": "Historische Datensynchronisierung",
+        "errorLogs": "Protokolle"
+    },
+    "buttons": {
+        "back": "Zurück",
+        "contact": "Kontaktiere uns",
+        "create": "Konto erstellen",
+        "update": "API-Token aktualisieren",
+        "connect": "Zamp-Konto verbinden",
+        "save": "Einstellungen speichern",
+        "sync": "Historische Transaktionen synchronisieren",
+        "get": "Protokolle abrufen",
+        "down": "Protokolle als PDF herunterladen"
+    },
+    "switches": {
+        "allow": "Zamp die Steuerberechnungen übernehmen lassen?",
+        "send": "Transaktionsberichte an Zamp senden?",
+        "compress": "Zamp-Protokolle nach 30 Tagen komprimieren und aufbewahren?"
+    },
+    "status": {
+        "stat": "Status",
+        "count": "Anzahl",
+        "request": "Angefordert",
+        "complete": "Abgeschlossen",
+        "already": "Bereits vorhanden",
+        "update": "Aktualisiert",
+        "fail": "Fehlgeschlagen"
+    },
+    "labels": {
+        "start": "Startdatum",
+        "end": "Enddatum",
+        "date": "Datum",
+        "quest": "Haben Sie Fragen?",
+        "need": " Benötigen Sie ein Konto?",
+        "state": "Steuerpflichtige Bundesstaaten",
+        "token": "Zamp API-Token"
+    },
+    "places": {
+        "token": "Zamp API-Token eingeben",
+        "states": "Bundesstaaten auswählen"
+    },
+    "disclaim": {
+        "disclaimer": "Um das Zamp Tax Provider Plugin zu nutzen, benötigen Sie den API-Token Ihres Zamp-Kontos. Dieser Wert wird Ihnen während des Onboardings bei uns zur Verfügung gestellt! Wenn Sie noch keinen API-Token haben, kontaktieren Sie uns bitte über die Schaltfläche oben rechts.",
+        "connected": "Verbunden!"
+    },
+    "errors": {
+        "log": "Datei für das ausgewählte Datum nicht gefunden."
+    },
+    "messages": {
+        "init": "Protokoll-Download eingeleitet",
+        "date": " Bitte wählen Sie ein Datum",
+        "success": "Der Vorgang war erfolgreich. Zamp-Einstellungen gespeichert.",
+        "fail": "Der Vorgang ist fehlgeschlagen. ",
+        "failtoken": "Der Vorgang ist fehlgeschlagen. Token ungültig.",
+        "successtoken": "Der Vorgang war erfolgreich. Token validiert.",
+        "syncwarn": "Um die Funktion zur historischen Synchronisierung zu nutzen, müssen Sie zuerst Ihr Zamp-Konto im Tab Zamp-Einstellungen verbinden."
+    }
+}
