@@ -1,27 +1,41 @@
 {
     "name": "zamp-tax/zamp-tax",
-    "description": "zamp-tax/zamp-tax",
+    "description": "Zamp Tax provides tax calculations and reporting through the Zamp API",
     "type": "shopware-platform-plugin",
     "version": "1.0.1",
     "license": "proprietary",
+    "authors": [
+        {
+            "name": "Zamp Technologies, Inc.",
+            "homepage": "https://zamp.com"
+        }
+    ],
     "require": {
-        "shopware/core": "6.*"
+        "php": ">=7.4",
+        "shopware/core": "^6.4.0"
     },
     "extra": {
         "shopware-plugin-class": "ZampTax\\ZampTax",
         "label": {
             "de-DE": "Zamp Tax",
             "en-GB": "Zamp Tax"
+        },
+        "description": {
+            "de-DE": "Zamp Tax bietet Steuerberechnungen und -berichte über die Zamp-API",
+            "en-GB": "Zamp Tax provides tax calculations and reporting through the Zamp API"
+        },
+        "manufacturerLink": {
+            "de-DE": "https://zamp.com",
+            "en-GB": "https://zamp.com"
+        },
+        "supportLink": {
+            "de-DE": "https://support.zamp.com/article/45-contact-us",
+            "en-GB": "https://support.zamp.com/article/45-contact-us"
         }
     },
     "autoload": {
         "psr-4": {
             "ZampTax\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "ZampTax\\Tests\\": "tests/"
         }
     }
 }
