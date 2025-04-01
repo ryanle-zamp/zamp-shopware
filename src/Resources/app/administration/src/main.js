@@ -29,23 +29,19 @@ Component.override('sw-settings-customer-group-detail', {
 		onSave() {
 			this.$super('onSave');
 
-			// Retrieve existing custom fields, or initialize an empty object if none exist
 			let customFields = this.customerGroup.customFields || {};
 
-			// Merge or update the tax_exempt_code field in the customFields object
 			customFields.tax_exempt_code = this.customerGroup.taxExemptCode;
 
-			// Assign the updated customFields back to the customerGroup entity
 			this.customerGroup.customFields = customFields;
 	
 			console.log('Customer Group Tax Exempt Code: ', this.customerGroup.taxExemptCode);
 			var cgId = this.customerGroup.id;
 	
 			this.customerGroupRepository.save(this.customerGroup).then(() => {
-				// Fetch the updated entity after saving
 				return this.customerGroupRepository.get(cgId, Shopware.Context.api);
 			}).then(entity => {
-				this.customerGroup = entity; // Update the local state with the retrieved entity
+				this.customerGroup = entity;
 				console.log("Entity: ", JSON.stringify(this.customerGroup));
 			}).catch(error => {
 				console.error("Failed to save customer group: ", error);
@@ -65,7 +61,6 @@ Component.override('sw-product-detail-base', {
 
     data: function() {
         return {
-            // Local property to store the product tax code
             zampProductTaxCode: '',
             zampProductId: '',
             zampEntityId: '',
@@ -87,7 +82,6 @@ Component.override('sw-product-detail-base', {
     },
 
     watch: {
-        // Watch for changes in the product, initialize custom field when available
         product(val) {
 
             if(val){
@@ -130,14 +124,14 @@ Component.override('sw-product-detail-base', {
 Component.override('sw-product-detail', {
     data() {
         return {
-            productTaxCode: '', // Define a local property to hold the tax code
+            productTaxCode: '',
             zampProductId: '',
             zampEntity: {}
         };
     },
     computed: {
         zampProductTaxCodeRepository() {
-            return this.repositoryFactory.create('zamp_product_tax_code'); // Create the repository for zamp_product_tax_code
+            return this.repositoryFactory.create('zamp_product_tax_code');
         },
         product() {
             return this.$super('product');
@@ -147,9 +141,8 @@ Component.override('sw-product-detail', {
     methods: {
         onSave() {
 
-            // Call the original save method first
             this.$super('onSave').then(() => {
-                const zampProductId = this.product.id; // Access the saved product ID
+                const zampProductId = this.product.id;
 
                 console.log("Product ID: ", zampProductId);
 
@@ -165,14 +158,12 @@ Component.override('sw-product-detail', {
                     const { Criteria } = Shopware.Data;
                     criteria.addFilter(Criteria.equals('productId', zampProductId));
 
-                    // Search for existing entry in zamp_product_tax_code
                     this.zampProductTaxCodeRepository.search(criteria, Shopware.Context.api)
                     .then(result => {
                         if(result.length > 0){
-                            // Entry exists, update it
                             this.zampEntity = result.first();
                             const zptcId = this.zampEntity.id;
-                            this.zampEntity.productTaxCode = zampProductTaxCode; // Update the tax code
+                            this.zampEntity.productTaxCode = zampProductTaxCode;
 
                             return this.zampProductTaxCodeRepository.save(this.zampEntity, Shopware.Context.api)
                                 .then(() => {
@@ -186,14 +177,13 @@ Component.override('sw-product-detail', {
                                 });
                                 
                         } else {
-                            // Create a new entity properly using the repository's `create()` method
                             this.zampEntity = this.zampProductTaxCodeRepository.create(Shopware.Context.api);
 
-                            const randomHexUuid = Shopware.Utils.createId(); // Generate a new UUID
+                            const randomHexUuid = Shopware.Utils.createId();
 
-                                this.zampEntity.id = randomHexUuid;// Include the randomHexUuid
-                                this.zampEntity.productId = zampProductId; // Use the product ID from the saved product
-                                this.zampEntity.productTaxCode = zampProductTaxCode; // Use the tax code from the child component
+                                this.zampEntity.id = randomHexUuid;
+                                this.zampEntity.productId = zampProductId;
+                                this.zampEntity.productTaxCode = zampProductTaxCode;
 
                             return this.zampProductTaxCodeRepository.save(this.zampEntity, Shopware.Context.api)
                                 .then(() => {

@@ -111,7 +111,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
             'identifier' => 'ZampTax\Checkout\Cart\Tax\ZampTax'
         ]);
 
-        // Check if result is found and cast 'active' to boolean
         return $result ? (bool) $result['active'] : null;
     }
 
@@ -129,14 +128,11 @@ class ZampEventSubscriber implements EventSubscriberInterface
         $criteria->addFilter(new EqualsFilter('orderId', $orderId));
         $criteria->setLimit(1);
     
-        // Search for the transaction record
         $result = $this->zampTransactionsRepository->search($criteria, Context::createDefaultContext());
     
-        // Check if a record was found
         if ($result->count() > 0) {
             $transaction = $result->first();
     
-            // Return transaction data as JSON
             return json_encode([
                 'found' => true,
                 'suffix' => $transaction->getCurrentIdSuffix(),
@@ -145,7 +141,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
             ]);
         }
     
-        // Return a default JSON response if no record is found
         return json_encode([
             'found' => false,
             'suffix' => "01",
@@ -156,22 +151,17 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
     public function get_trans_info(string $orderId): string {
 
-        // Set the timezone to Central Standard Time
         $timezone = new DateTimeZone('UTC');
     
-        // SQL query with a placeholder for safer parameterization
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('orderId', $orderId));
         $criteria->setLimit(1);
 
-        // Search for the transaction record
         $result = $this->zampTransactionsRepository->search($criteria, Context::createDefaultContext());
 
-        // Create a new DateTime object
         $dateTime = new DateTime('now', $timezone);
                             
-        // Format the date and time as needed
-        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+        $formattedTime = $dateTime->format('H:i:s');
 
         $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
         fwrite($hook_file, "\n\n");
@@ -179,11 +169,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
         fwrite($hook_file, "RESULT: " . json_encode($result, JSON_PRETTY_PRINT));
         fclose($hook_file);
     
-        // Check if a record was found
         if ($result->count() > 0) {
             $transaction = $result->first();
     
-            // Return transaction data as JSON
             return json_encode([
                 'found' => true,
                 'suffix' => $transaction->getCurrentIdSuffix(),
@@ -194,7 +182,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
             ]);
         }
     
-        // Return a default JSON response if no record is found
         return json_encode([
             'found' => false
         ]);
@@ -202,11 +189,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
     public function onOrderWritten(EntityWrittenEvent $event): void
     {
-        // Retrieve the written entities from the event
         foreach ($event->getWriteResults() as $result) {
             $payload = $result->getPayload();
 
-            // Check if the payload has an 'id' field
             if (isset($payload['id'])) {
                 $orderId = $payload['id'];
                 $this->logOrderDetails($orderId, $event->getContext());
@@ -217,14 +202,12 @@ class ZampEventSubscriber implements EventSubscriberInterface
     public function onOrderDeleted(EntityDeletedEvent $event): void
     {
         if($this->getTaxProviderActiveStatus()){
-            // Set the timezone to Central Standard Time
             $timezone = new DateTimeZone('UTC');
 
             $zamp_settings = $this->getZampSettings();
 
             $bear_token = $zamp_settings['api_token'];
 
-            // Retrieve the written entities from the event
             foreach ($event->getWriteResults() as $result) {
                 $payload = $result->getPayload();
 
@@ -232,7 +215,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
 
 
-                // Check if the payload has an 'id' field
                 if (isset($payload['id'])) {
 
                     $versionId = $payload['versionId'];
@@ -244,11 +226,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                         if(json_decode($transaction_info)->found && json_decode($transaction_info)->version == $versionId){
 
-                            // Create a new DateTime object
                             $dateTime = new DateTime('now', $timezone);
                                     
-                            // Format the date and time as needed
-                            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                            $formattedTime = $dateTime->format('H:i:s');
 
                             $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                             fwrite($hook_file, "\n\n");
@@ -264,7 +244,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                             $origin_id = "SW-" . $orderId . "-" . $suffix;
 
-                            // Get original transaction object from Zamp
                             $curl_origin = curl_init();
 
                             $url_origin = 'https://api.zamp.com/transactions/' . $origin_id;
@@ -294,11 +273,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                             curl_close($curl_origin);
 
-                            // Create a new DateTime object
                             $dateTime = new DateTime('now', $timezone);
                                     
-                            // Format the date and time as needed
-                            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                            $formattedTime = $dateTime->format('H:i:s');
 
                             if ($err_origin){
                                 $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
@@ -310,13 +287,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                             } else {
                                 if($response_origin){
 
-                                    // Create a new DateTime object
                                     $dateTime = new DateTime('now', $timezone);
                                     
-                                    // Format the date and time as needed
-                                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                                    $formattedTime = $dateTime->format('H:i:s');
 
-                                    // Split the response into headers and body
                                     $responseParts_origin = explode("\r\n\r\n", $response_origin, 2);
                                     $httpResponseHeaders_origin = isset($responseParts_origin[0]) ? $responseParts_origin[0] : '';
                                     $jsonResponseBody_origin = isset($responseParts_origin[1]) ? $responseParts_origin[1] : '';
@@ -328,7 +302,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                     fclose($hook_file);
 
                                     
-                                    // Get original transaction object from Zamp
                                     $curl_del = curl_init();
 
                                     $url_del = 'https://api.zamp.com/transactions/' . $origin_id;
@@ -361,11 +334,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                     
 
                                     if ($err_del){
-                                        // Create a new DateTime object
                                         $dateTime = new DateTime('now', $timezone);
                                             
-                                        // Format the date and time as needed
-                                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                                        $formattedTime = $dateTime->format('H:i:s');
 
                                         $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                                         fwrite($hook_file, "\n\n");
@@ -375,13 +346,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                                     } else {
                                         if($response_del){
-                                            // Create a new DateTime object
                                             $dateTime = new DateTime('now', $timezone);
                                         
-                                            // Format the date and time as needed
-                                            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                                            $formattedTime = $dateTime->format('H:i:s');
 
-                                            // Split the response into headers and body
                                             $responseParts_del = explode("\r\n\r\n", $response_del, 2);
                                             $httpResponseHeaders_del = isset($responseParts_del[0]) ? $responseParts_del[0] : '';
                                             $jsonResponseBody_del = isset($responseParts_del[1]) ? $responseParts_del[1] : '';
@@ -405,7 +373,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                                                 $next_id = "SW-" . $orderId . "-" . $suffstring;
 
-                                                // Get original transaction object from Zamp
                                                 $curl_next = curl_init();
 
                                                 $url_next = 'https://api.zamp.com/transactions/' . $next_id;
@@ -435,11 +402,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                                                 curl_close($curl_next);
 
-                                                // Create a new DateTime object
                                                 $dateTime = new DateTime('now', $timezone);
                                                         
-                                                // Format the date and time as needed
-                                                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                                                $formattedTime = $dateTime->format('H:i:s');
 
                                                 if ($err_next){
                                                     $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
@@ -451,13 +416,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                                 } else {
                                                     if($response_next){
 
-                                                        // Create a new DateTime object
                                                         $dateTime = new DateTime('now', $timezone);
                                                         
-                                                        // Format the date and time as needed
-                                                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                                                        $formattedTime = $dateTime->format('H:i:s');
 
-                                                        // Split the response into headers and body
                                                         $responseParts_next = explode("\r\n\r\n", $response_next, 2);
                                                         $httpResponseHeaders_next = isset($responseParts_next[0]) ? $responseParts_next[0] : '';
                                                         $jsonResponseBody_next = isset($responseParts_next[1]) ? $responseParts_next[1] : '';
@@ -490,17 +452,14 @@ class ZampEventSubscriber implements EventSubscriberInterface
     public function onStateTransition(StateMachineTransitionEvent $event): void
     {
         if($this->getTaxProviderActiveStatus()){
-            // Set the timezone to Central Standard Time
             $timezone = new DateTimeZone('UTC');
 
             $entityName = $event->getEntityName();
             $toPlace = $event->getToPlace()->getName();   
             
-            // Create a new DateTime object
             $dateTime = new DateTime('now', $timezone);
                     
-            // Format the date and time as needed
-            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+            $formattedTime = $dateTime->format('H:i:s');
 
             if($entityName == 'order_transaction' && $toPlace == 'Paid'){
 
@@ -629,11 +588,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                 $order_number = $order->getOrderNumber();
 
-                // Create a new DateTime object
                 $dateTime = new DateTime('now', $timezone);
                         
-                // Format the date and time as needed
-                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                $formattedTime = $dateTime->format('H:i:s');
 
                 $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                 fwrite($hook_file, "\n\n");
@@ -678,7 +635,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                 }
 
-                // Format the date as "Y-m-d h:i:s"
                 $formattedDate = $order->createdAt->format('Y-m-d H:i:s');
 
 
@@ -735,11 +691,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                     $zamp_obj = json_encode($zamp_json);
 
-                    // Create a new DateTime object
                     $dateTime = new DateTime('now', $timezone);
                             
-                    // Format the date and time as needed
-                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                    $formattedTime = $dateTime->format('H:i:s');
 
                     $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                     fwrite($hook_file, "\n\n");
@@ -749,7 +703,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
         
                     $curl = curl_init();
                 
-                    $url = "https://api.zamp.com/calculations";
+                    $url = "https:
         
                     curl_setopt_array($curl, [
                         CURLOPT_URL => $url,
@@ -773,17 +727,14 @@ class ZampEventSubscriber implements EventSubscriberInterface
             
                     header("Access-Control-Allow-Origin: *");
             
-                    // die(print_r(json_decode($response3)));
             
                     $err = curl_error($curl);
             
                     curl_close($curl);
 
-                    // Create a new DateTime object
                     $dateTime = new DateTime('now', $timezone);
                             
-                    // Format the date and time as needed
-                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                    $formattedTime = $dateTime->format('H:i:s');
             
                     if ($err){
                         $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
@@ -794,13 +745,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                     } else {
                         if($response){
 
-                            // Create a new DateTime object
                             $dateTime = new DateTime('now', $timezone);
                     
-                            // Format the date and time as needed
-                            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                            $formattedTime = $dateTime->format('H:i:s');
 
-                            // Split the response into headers and body
                             $responseParts = explode("\r\n\r\n", $response, 2);
                             $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
                             $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
@@ -814,11 +762,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
                             $zamp_json->taxCollected = (float) number_format(json_decode($jsonResponseBody)->taxDue, 2);
                             $zamp_json->total = (float) number_format($zamp_json->subtotal + $zamp_json->shippingHandling + $zamp_json->taxCollected, 2);
 
-                            // Create a new DateTime object
                             $dateTime = new DateTime('now', $timezone);
                     
-                            // Format the date and time as needed
-                            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                            $formattedTime = $dateTime->format('H:i:s');
 
                             $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                             fwrite($hook_file, "\n\n");
@@ -828,7 +774,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                             
                             $curl2 = curl_init();
 
-                            $url2 = "https://api.zamp.com/transactions";
+                            $url2 = "https:
 
                             curl_setopt_array($curl2, [
                                 CURLOPT_URL => $url2,
@@ -852,7 +798,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                             header("Access-Control-Allow-Origin: *");
 
-                            // die(print_r(json_decode($response3)));
 
                             $err2 = curl_error($curl2);
 
@@ -862,8 +807,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                                 $dateTime = new DateTime('now', $timezone);
                     
-                                // Format the date and time as needed
-                                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                                $formattedTime = $dateTime->format('H:i:s');
 
                                 $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                                 fwrite($hook_file, "\n\n");
@@ -874,13 +818,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                 if($response2){
                                     $zamp_resp = json_decode($response2);
 
-                                    // Create a new DateTime object
                                     $dateTime = new DateTime('now', $timezone);
                             
-                                    // Format the date and time as needed
-                                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                                    $formattedTime = $dateTime->format('H:i:s');
 
-                                    // Split the response into headers and body
                                     $responseParts2 = explode("\r\n\r\n", $response2, 2);
                                     $httpResponseHeaders2 = isset($responseParts2[0]) ? $responseParts2[0] : '';
                                     $jsonResponseBody2 = isset($responseParts2[1]) ? $responseParts2[1] : '';
@@ -1035,11 +976,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                 $order = $this->orderRepository->search($criteria, $context)->first();
 
-                // Create a new DateTime object
                 $dateTime = new DateTime('now', $timezone);
                             
-                // Format the date and time as needed
-                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                $formattedTime = $dateTime->format('H:i:s');
 
                 $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                 fwrite($hook_file, "\n\n");
@@ -1080,7 +1019,6 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                 $zamp_resp = new stdClass();
 
-                // Get original transaction object from Zamp
                 $curl_origin = curl_init();
 
                 $url_origin = 'https://api.zamp.com/transactions/' . $origin_id;
@@ -1114,11 +1052,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                 if ($err_origin){
 
-                    // Create a new DateTime object
                     $dateTime = new DateTime('now', $timezone);
                             
-                    // Format the date and time as needed
-                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                    $formattedTime = $dateTime->format('H:i:s');
 
                     $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                     fwrite($hook_file, "\n\n");
@@ -1129,13 +1065,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                 } else {
                     if($response_origin){
 
-                        // Create a new DateTime object
                         $dateTime = new DateTime('now', $timezone);
                             
-                        // Format the date and time as needed
-                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                        $formattedTime = $dateTime->format('H:i:s');
 
-                        // Split the response into headers and body
                         $responseParts_origin = explode("\r\n\r\n", $response_origin, 2);
                         $httpResponseHeaders_origin = isset($responseParts_origin[0]) ? $responseParts_origin[0] : '';
                         $jsonResponseBody_origin = isset($responseParts_origin[1]) ? $responseParts_origin[1] : '';
@@ -1185,11 +1118,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
                         $refund_json->shipToAddress->country = $origin_transaction->shipToAddress->country;
                         $refund_json->lineItems = $refund_items_arr;
 
-                        // Create a new DateTime object
                         $dateTime = new DateTime('now', $timezone);
                             
-                        // Format the date and time as needed
-                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                        $formattedTime = $dateTime->format('H:i:s');
 
                         $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                         fwrite($hook_file, "\n\n");
@@ -1199,7 +1130,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                         $curl_whole_refund = curl_init();
 
-                        $url_whole_refund = "https://api.zamp.com/transactions";
+                        $url_whole_refund = "https:
             
                         curl_setopt_array($curl_whole_refund, [
                             CURLOPT_URL => $url_whole_refund,
@@ -1223,17 +1154,14 @@ class ZampEventSubscriber implements EventSubscriberInterface
             
                         header("Access-Control-Allow-Origin: *");
             
-                        // die(print_r(json_decode($response3)));
             
                         $err_whole_refund = curl_error($curl_whole_refund);
             
                         curl_close($curl_whole_refund);
 
-                        // Create a new DateTime object
                         $dateTime = new DateTime('now', $timezone);
                             
-                        // Format the date and time as needed
-                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                        $formattedTime = $dateTime->format('H:i:s');
             
                         if ($err_whole_refund){
                             $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
@@ -1244,13 +1172,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                         } else {
                             if($response_whole_refund){
 
-                                // Create a new DateTime object
                                 $dateTime = new DateTime('now', $timezone);
                                     
-                                // Format the date and time as needed
-                                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                                $formattedTime = $dateTime->format('H:i:s');
 
-                                // Split the response into headers and body
                                 $responseParts_whole_refund = explode("\r\n\r\n", $response_whole_refund, 2);
                                 $httpResponseHeaders_whole_refund = isset($responseParts_whole_refund[0]) ? $responseParts_whole_refund[0] : '';
                                 $jsonResponseBody_whole_refund = isset($responseParts_whole_refund[1]) ? $responseParts_whole_refund[1] : '';
@@ -1278,20 +1203,17 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
     private function logOrderDetails(string $orderId, Context $context): void
     {
-        // Load the full order entity
         $criteria = new Criteria([$orderId]);
-        $criteria->addAssociation('lineItems'); // Fetching associated line items
-        $criteria->addAssociation('addresses'); // Fetching associated addresses
+        $criteria->addAssociation('lineItems');
+        $criteria->addAssociation('addresses');
         $criteria->addAssociation('addresses.country');
         $criteria->addAssociation('addresses.countryState');
 
         $order = $this->orderRepository->search($criteria, $context)->first();
 
         if ($order) {
-            // Convert the order to an array for logging purposes
             $orderData = json_encode($order, JSON_PRETTY_PRINT);
 
-            // Log the order data to a file
             $logFile = fopen("order_log.txt", "a+");
             fwrite($logFile, "\n\nOrder Data: " . $orderData);
             fclose($logFile);

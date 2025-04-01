@@ -51,12 +51,9 @@ class ZampController extends AbstractController
 	#[Route('/api/v1/_action/zamp-tax/test-api', name: 'api.zamp_tax.test_api', methods: ["POST", "GET"])]
 	public function testApiToken(): JsonResponse
 	{
-		// Set the timezone to Central Standard Time
         $timezone = new DateTimeZone('UTC');
 
 		$date = date('Y-m-d');
-
-        // Set the timezone to Central Standard Time
 
 		$token = $_POST['token'];
 		$valid = "";
@@ -112,7 +109,6 @@ class ZampController extends AbstractController
         ]);
 
         curl_setopt($curl, CURLOPT_HEADER, true);
-        // curl_setopt($curl, CURLOPT_NOBODY, true);
     
         $response = curl_exec($curl);
 
@@ -120,25 +116,15 @@ class ZampController extends AbstractController
 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 
-        // die(print_r($httpcode));
-
-		// if($err){
-		// 	die(print_r($err));
-		// }
-
         curl_close($curl);
 
         if($httpcode == 200){
-			// die(print("True!"));
             $valid = true;
 
-            // Create a new DateTime object
             $dateTime = new DateTime('now', $timezone);
                     
-            // Format the date and time as needed
-            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+            $formattedTime = $dateTime->format('H:i:s');
 
-            // Split the response into headers and body
             $responseParts = explode("\r\n\r\n", $response, 2);
             $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
             $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
@@ -149,16 +135,12 @@ class ZampController extends AbstractController
             fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody), JSON_PRETTY_PRINT));
 			fclose($hook_file);
         } else {
-			// die(print("False!"));
             $valid = false;
 
-            // Create a new DateTime object
             $dateTime = new DateTime('now', $timezone);
                     
-            // Format the date and time as needed
-            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+            $formattedTime = $dateTime->format('H:i:s');
 
-			// Split the response into headers and body
             $responseParts = explode("\r\n\r\n", $response, 2);
             $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
             $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
@@ -337,11 +319,9 @@ class ZampController extends AbstractController
 
 		$order = $this->orderRepository->search($criteria, $context)->first();
 
-        // Create a new DateTime object
         $dateTime = new DateTime('now', $timezone);
                     
-        // Format the date and time as needed
-        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+        $formattedTime = $dateTime->format('H:i:s');
 
 		$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
 		fwrite($hook_file, "\n\n");
@@ -387,7 +367,6 @@ class ZampController extends AbstractController
 
 		}
 
-		// Format the date as "Y-m-d h:i:s"
 		$formattedDate = $order->createdAt->format('Y-m-d H:i:s');
 
 		if($trans_enabled && in_array($state, $taxable_states)){
@@ -442,11 +421,9 @@ class ZampController extends AbstractController
 
 			$zamp_obj = json_encode($zamp_json);
 
-            // Create a new DateTime object
             $dateTime = new DateTime('now', $timezone);
                     
-            // Format the date and time as needed
-            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+            $formattedTime = $dateTime->format('H:i:s');
 
 			$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
 			fwrite($hook_file, "\n\n");
@@ -479,19 +456,15 @@ class ZampController extends AbstractController
 			$response = curl_exec($curl);
 	
 			header("Access-Control-Allow-Origin: *");
-	
-			// die(print_r(json_decode($response3)));
-	
+		
 			$err = curl_error($curl);
 	
 			curl_close($curl);
 	
 			if ($err){
-                // Create a new DateTime object
                 $dateTime = new DateTime('now', $timezone);
                                                     
-                // Format the date and time as needed
-                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                $formattedTime = $dateTime->format('H:i:s');
 
                 $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                 fwrite($hook_file, "\n\n");
@@ -501,16 +474,13 @@ class ZampController extends AbstractController
 			} else {
 				if($response){
 
-                    // Split the response into headers and body
                     $responseParts = explode("\r\n\r\n", $response, 2);
                     $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
                     $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
 
-                    // Create a new DateTime object
                     $dateTime = new DateTime('now', $timezone);
                             
-                    // Format the date and time as needed
-                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                    $formattedTime = $dateTime->format('H:i:s');
 
 					$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
 					fwrite($hook_file, "\n\n");
@@ -547,7 +517,6 @@ class ZampController extends AbstractController
 
 					header("Access-Control-Allow-Origin: *");
 
-					// die(print_r(json_decode($response3)));
 
 					$err2 = curl_error($curl2);
 
@@ -557,11 +526,9 @@ class ZampController extends AbstractController
 
 					if ($err2){
 
-                        // Create a new DateTime object
                         $dateTime = new DateTime('now', $timezone);
                                     
-                        // Format the date and time as needed
-                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                        $formattedTime = $dateTime->format('H:i:s');
 
 						$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
 						fwrite($hook_file, "\n\n");
@@ -574,18 +541,15 @@ class ZampController extends AbstractController
 						if($response2){
 							
 
-                            // Split the response into headers and body
                             $responseParts2 = explode("\r\n\r\n", $response2, 2);
                             $httpResponseHeaders2 = isset($responseParts2[0]) ? $responseParts2[0] : '';
                             $jsonResponseBody2 = isset($responseParts2[1]) ? $responseParts2[1] : '';
 
                             $zamp_resp = json_decode($jsonResponseBody2);
 
-                            // Create a new DateTime object
                             $dateTime = new DateTime('now', $timezone);
                                     
-                            // Format the date and time as needed
-                            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                            $formattedTime = $dateTime->format('H:i:s');
 
                             $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
                             fwrite($hook_file, "\n\n");
