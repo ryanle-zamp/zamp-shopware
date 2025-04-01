@@ -272,8 +272,224 @@ class ZampTax extends AbstractTaxProvider
             fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
             fclose($hook_file);	
         } else {
-            // Rest of the implementation...
-            // (Code continues as before)
+            if(!empty($cart->getDeliveries())){
+ 
+                $del = $cart->getDeliveries()->first();
+                $address = $del->getLocation()->getAddress();
+
+                $street_address = $address->street;
+                $zipcode = $address->zipcode;
+                $city = $address->city;
+                
+                $state_obj = $del->getLocation()->getState();
+
+                $countryIso = $del->getLocation()->getCountry()->getIso();
+
+                $state_name = $state_obj->name;
+    
+                if(in_array($state_shortcodes[$state_name], $taxable_states)){
+                    $taxable = true;
+                }		
+            }
+            if($taxable){
+
+                $zamp_items_arr = array();
+                $subtotal = 0;
+                $zamp_json = new stdClass();
+                $zamp_json->id = "CALC-" . $cart->getHash();
+                $zamp_json->name = 'INV-' . $zamp_json->id;
+                $zamp_json->transactedAt = date('Y-m-d H:i:s');
+                $zamp_json->entity = $zamp_exempt_code != "" ? $zamp_exempt_code : null;
+                $zamp_json->purpose = $zamp_exempt_code == "WHOLESALER" ? "RESALE" : null;
+                $zamp_json->discount = 0;
+                   
+    
+                foreach ($cart->getLineItems() as $item) {
+
+                    $type = $item->getType();
+
+                    if($type == 'promotion'){
+                        $zamp_json->discount += ($item->getPrice()->getTotalPrice()) * -1;
+                    } else {
+                        $item_price = $item->getPrice()->getUnitPrice();
+
+                        $line_price = $item->getPrice()->getTotalPrice();
+    
+                        $item_obj = new stdClass();
+                        $item_obj->quantity = $item->getQuantity();
+                           $subtotal += $line_price;
+                        $item_obj->id = $item->getId();
+
+                        $item_obj->amount = (float) number_format($item_price, 2, '.', '');
+                        $item_obj->productName = $item->getLabel();
+                        $item_obj->productSku = $item->getPayloadValue('productNumber');
+                        $ptc = $this->getZampProductTaxCode($item_obj->id) ? $this->getZampProductTaxCode($item_obj->id)['product_tax_code'] : '';
+                        $item_obj->productTaxCode = $ptc !== '' && (substr($ptc, 0, 5) == "R_TPP" || substr($ptc, 0, 5) == "R_SRV" || substr($ptc, 0, 5) == "R_DIG") ? $ptc : "R_TPP";
+    
+                        array_push($zamp_items_arr, $item_obj);
+                    }
+                    
+                }
+
+                    
+                $zamp_json->subtotal = $subtotal - $zamp_json->discount;
+                $zamp_json->shippingHandling = $cart->getDeliveries()->first()->getShippingCosts()->getTotalPrice();
+                $zamp_json->total = $zamp_json->subtotal + $zamp_json->shippingHandling;
+    
+                $zamp_json->shipToAddress = new stdClass();
+                $zamp_json->shipToAddress->line1 = $street_address != "" ? $street_address : "empty";
+                $zamp_json->shipToAddress->line2 = "empty";
+                $zamp_json->shipToAddress->city = $city;
+                $zamp_json->shipToAddress->state = $state_shortcodes[$state_name];
+                $zamp_json->shipToAddress->zip = $zipcode;
+                $zamp_json->shipToAddress->country = "US";
+                $zamp_json->lineItems = $zamp_items_arr;
+    
+                $zamp_obj = json_encode($zamp_json);
+
+                
+                $dateTime = new DateTime('now', $timezone);
+                
+                $formattedTime = $dateTime->format('H:i:s');
+
+                $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+                fwrite($hook_file, "\n\n");
+                fwrite($hook_file, $formattedTime . " - INITIAL REQUEST FOR ZAMP CALCULATION GENERATED.\n ");
+                fwrite($hook_file, "REQUEST: " . json_encode($zamp_json, JSON_PRETTY_PRINT));
+                fclose($hook_file);	
+    
+                $curl = curl_init();
+            
+                $url = "https://api.zamp.com/calculations";
+    
+                curl_setopt_array($curl, [
+                    CURLOPT_URL => $url,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_ENCODING => "",
+                    CURLOPT_MAXREDIRS => 10,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    CURLOPT_CUSTOMREQUEST => "POST",
+                    CURLOPT_POSTFIELDS => $zamp_obj,
+                    CURLOPT_HTTPHEADER => [
+                    "Accept: application/json",
+                    "Content-Type: application/json",
+                    "Authorization: Bearer " . $bear_token
+                    ],
+                ]);
+    
+                curl_setopt($curl, CURLOPT_HEADER, true);
+                
+                $response = curl_exec($curl);
+        
+                header("Access-Control-Allow-Origin: *");
+                
+                $err = curl_error($curl);
+        
+                curl_close($curl);
+        
+                if ($err){
+
+                    $dateTime = new DateTime('now', $timezone);
+                                    
+                    $formattedTime = $dateTime->format('H:i:s');
+
+                    $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+                    fwrite($hook_file, "\n\n");
+                    fwrite($hook_file, $formattedTime . " - ERROR IN RESPONSE FROM ZAMP CALCULATION.\n");
+                    fwrite($hook_file, "ERROR: " . $err);
+                    fclose($hook_file);
+                    
+                } else {
+                    if($response){
+
+                        $dateTime = new DateTime('now', $timezone);
+                
+                        $formattedTime = $dateTime->format('H:i:s');
+
+                        $responseParts = explode("\r\n\r\n", $response, 2);
+                        $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
+                        $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
+
+                        $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+                        fwrite($hook_file, "\n\n");
+                        fwrite($hook_file, $formattedTime . " - INITIAL RESPONSE FROM ZAMP CALCULATION - " . strtok($httpResponseHeaders, "\r\n") . "\n");
+                        fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody), JSON_PRETTY_PRINT));
+                        fclose($hook_file);	
+
+                        $zamp_resp = json_decode($jsonResponseBody);
+    
+                        foreach($zamp_resp->lineItems as $line){
+                            $line_tax = 0.00;
+                            $line_rate = 0.0;
+    
+                            foreach($zamp_resp->taxes as $key => $taxi){
+                                if($taxi->lineItemId == $line->id){
+                                    $line_tax += $taxi->taxDue;
+                                    $line_rate += $taxi->taxRate;
+                                }
+                            }
+    
+                            $taxRate = (float) number_format($line_rate, 6, '.', '');
+                            $price = (float) number_format($line->amount * $line->quantity, 2, '.', '');
+                            $taxes = (float) number_format($line_tax, 2, '.', '');
+    
+                            $lineItemTaxes[$item->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                                [
+                                    new CalculatedTax($taxes, $taxRate, $price),
+                                ]
+                            );
+
+                            $cartPriceTaxes[$item->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                                [
+                                    new CalculatedTax($taxes, $taxRate, $price),
+                                ]
+                            );
+    
+                        }
+
+                        $dateTime = new DateTime('now', $timezone);
+                        
+                        $formattedTime = $dateTime->format('H:i:s');
+
+                        $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+                        fwrite($hook_file, "\n\n");
+                        fwrite($hook_file, $formattedTime . " - CART PRICE TAXES GENERATED WITH ZAMP CALCULATION. \n");
+                        fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
+                        fclose($hook_file);	
+                    }
+                }    
+                    
+            } else {
+                foreach ($cart->getLineItems() as $lineItem) {
+                
+                    $taxRate = 0;
+                    $price = $lineItem->getPrice()->getTotalPrice();
+                    $taxes = 0;
+        
+                    $lineItemTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                        [
+                            new CalculatedTax($taxes, $taxRate, $price),
+                        ]
+                    );
+        
+                    $cartPriceTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                        [
+                            new CalculatedTax($taxes, $taxRate, $price),
+                        ]
+                    );
+                }
+
+                $dateTime = new DateTime('now', $timezone);
+                
+                $formattedTime = $dateTime->format('H:i:s');
+
+                $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+                fwrite($hook_file, "\n\n");
+                fwrite($hook_file, $formattedTime . " - CART PRICE TAXES GENERATED WITH NON-TAXABLE ZAMP CALCULATION.\n");
+                fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
+                fclose($hook_file);
+            }
         }
         
         return new TaxProviderResult(
