@@ -56,7 +56,7 @@
     },
     "messages": {
         "init": "Protokoll-Download eingeleitet",
-        "date": " Bitte wählen Sie ein Datum",
+        "date": "Bitte wählen Sie ein Datum",
         "success": "Der Vorgang war erfolgreich. Zamp-Einstellungen gespeichert.",
         "fail": "Der Vorgang ist fehlgeschlagen. ",
         "failtoken": "Der Vorgang ist fehlgeschlagen. Token ungültig.",

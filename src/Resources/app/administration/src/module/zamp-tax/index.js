@@ -7,6 +7,11 @@ Shopware.Module.register('zamp-tax', {
 	description: 'Zamp Tax Plugin',
 	color: '#5075d3',
 	icon: 'default-action-settings',
+	snippets: {
+		'de-DE': require('./snippet/de-DE.json'),
+		'en-GB': require('./snippet/en-GB.json'),
+		'en-US': require('./snippet/en-GB.json'),
+	},
 	routes: {
 		dashboard: {
 			component: 'zamp-tax-main-page',

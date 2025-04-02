@@ -1,0 +1,66 @@
+{
+	"tabs": {
+		"settings": "Zamp Settings",
+		"historicalSync": "Historical Sync",
+		"errorLogs": "Logs"
+	},
+	"cards": {
+		"settings": "Zamp Tax Settings",
+		"historicalSync": "Historical Data Sync",
+		"errorLogs": "Logs"
+	},
+	"buttons": {
+		"back": "Back",
+		"contact": "Contact Us",
+		"create": "Create Account",
+		"update": "Update API Token",
+		"connect": "Connect Zamp Account",
+		"save": "Save Settings",
+		"sync": "Sync Historical Transactions",
+		"get": "Get Logs",
+		"down": "Download Logs as PDF"
+	},
+	"switches": {
+		"allow": "Allow Zamp to handle your Tax Calculations?",
+		"send": "Send your transaction reports to Zamp?",
+		"compress": "Compress and Retain Zamp logs after 30 days?"
+	},
+	"status": {
+		"stat": "Status",
+		"count": "Count",
+		"request": "Requested",
+		"complete": "Completed",
+		"already": "Already Exists",
+		"update": "Updated",
+		"fail": "Failed"
+	},
+	"labels": {
+		"start": "Start Date",
+		"end": "End Date",
+		"date": "Date",
+		"quest": "Have Questions?",
+		"need": " Need Account?",
+		"state": "Taxable States",
+		"token": "Zamp API Token"
+	},
+	"places": {
+		"token": "Enter Zamp API Token",
+		"states": "Choose States"
+	},
+	"disclaim": {
+		"disclaimer": "In order to use the Zamp Tax Provider Plugin, you will need your Zamp account's API token. This value will be provided to you during onboarding with us! If you don't yet have an API token, please reach out to us by clicking the button in the top right.",
+		"connected": "Connected!"
+	},
+	"errors": {
+		"log": "File not found for the selected date."
+	},
+	"messages": {
+		"init": "Log Download Initiated",
+		"date": " Please select a date",
+		"success": "The operation was successful. Zamp Settings Saved.",
+		"fail": "The operation has failed. ",
+		"failtoken": "The operation has failed. Token Invalid.",
+		"successtoken": "The operation was successful. Token Validated.",
+		"syncwarn": "In order to use Historical Sync feature you will need to first connect your Zamp account in the Zamp Settings tab."
+	}
+}
