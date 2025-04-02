@@ -56,8 +56,5 @@
 			<tag name="kernel.event_subscriber" event="order.deleted"/>
         </service>
 
-		
-
-		 
     </services>
 </container>

@@ -13,28 +13,22 @@ use Shopware\Core\Framework\Plugin\Context\UninstallContext;
 use Shopware\Core\Framework\Plugin\Context\UpdateContext;
 use Shopware\Core\Framework\Uuid\Uuid;
 
-/**
- * Zamp Tax integration plugin for Shopware 6
- */
 class ZampTax extends Plugin
 {
-    /**
-     * Installs the plugin and creates required data
-     * 
-     * @param InstallContext $installContext Installation context
-     */
     public function install(InstallContext $installContext): void
     {
         $context = $installContext->getContext();
         
+        // Getting the rule repository
         $ruleRepo = $this->container->get('rule.repository');
 
+        // Defining rule data structure
         $ruleData = [
             'name' => 'Zamp Rule',
             'priority' => 0,
             'conditions' => [
                 [
-                    'type' => 'cartCartAmount',
+                    'type' => 'cartCartAmount', // Adjusted type if necessary
                     'value' => [
                         'operator' => '>=',
                         'amount' => 0,
@@ -43,167 +37,195 @@ class ZampTax extends Plugin
             ],
         ];
 
+        // Creating the rule in the repository
         $ruleRepo->create([$ruleData], $context);
 
+        // Fetch the rule ID by searching for the rule by name
         $rules_criteria = new Criteria();
         $rules_criteria->addFilter(new EqualsFilter('name', 'Customers from USA'));
         $ruleId = $ruleRepo->searchIds($rules_criteria, $context)->firstId();
 
-        $taxProId = Uuid::randomHex();
+		$taxProId = Uuid::randomHex();
 
-        $lang_criteria = new Criteria();
-        $lang_criteria->addFilter(new EqualsFilter('name', 'English (US)'));
-        $lang_repo = $this->container->get('language.repository');
-        $langId = $lang_repo->searchIds($lang_criteria, $context)->firstId();
+		$lang_criteria = new Criteria();
+		$lang_criteria->addFilter(new EqualsFilter('name', 'English (US)'));
+		$lang_repo = $this->container->get('language.repository');
+		$langId = $lang_repo->searchIds($lang_criteria, $context)->firstId();
 
+        // Getting the tax provider repository
         $taxRepo = $this->container->get('tax_provider.repository');
 
-        $taxProTran = $this->container->get('tax_provider_translation.repository');
+		$taxProTran = $this->container->get('tax_provider_translation.repository');
 
+        // Defining tax provider data structure
         $taxProviderData = [
             [
                 'id' => $taxProId,
                 'identifier' => \ZampTax\Checkout\Cart\Tax\ZampTax::class,
                 'priority' => 1,
-                'active' => false,
+                'active' => false, // Activate this via the `activate` lifecycle method
                 'availabilityRuleId' => $ruleId,
             ],
         ];
 
-        $taxProviderTranslationData = [
-            [
-                'taxProviderId' => $taxProId,
-                'languageId' => $langId,
-                'name' => 'Zamp Tax'
-            ]
-        ];
+		$taxProviderTranslationData = [
+			[
+				'taxProviderId' => $taxProId,
+				'languageId' => $langId,
+				'name' => 'Zamp Tax'
+			]
+		];
 
+        // Creating the tax provider in the repository
         $taxRepo->create($taxProviderData, $context);
 
-        $taxProTran->create($taxProviderTranslationData, $context);
+		$taxProTran->create($taxProviderTranslationData, $context);
     }
 
-    /**
-     * Uninstalls the plugin and removes created data if configured
-     * 
-     * @param UninstallContext $uninstallContext Uninstallation context
-     */
     public function uninstall(UninstallContext $uninstallContext): void
     {
         parent::uninstall($uninstallContext);
 
         if ($uninstallContext->keepUserData()) {
-            return;
-        }
+			
+			$tax_repo = $this->container->get('tax_provider.repository');
 
-        $context = $uninstallContext->getContext();
+			$context = $uninstallContext->getContext();
 
-        $connection = $this->container->get(Connection::class);
- 
-        $tax_repo = $this->container->get('tax_provider.repository');
+			$tax_pro_criteria = new Criteria();
 
-        $rule_repo = $this->container->get('rule.repository');
+			$tax_pro_criteria->addFilter(new EqualsFilter('identifier', 'ZampTax\Checkout\Cart\Tax\ZampTax'));
+		
+			$tax_pro_id = $tax_repo->searchIds($tax_pro_criteria, $context)->firstId();
 
-        $rule_crit = new Criteria();
+			if($tax_pro_id){
 
-        $rule_crit->addFilter(new EqualsFilter('name', 'Zamp Rule'));
+				$tax_repo->update([
+					[
+						'id' => $tax_pro_id,
+						'availabilityRuleId' => null
+					]
+					], $context);
+		
+				$tax_repo->delete([
+					[
+						'id' => $tax_pro_id
+					]
+				], $context);
+			}
 
-        $rule_id = $rule_repo->searchIds($rule_crit, $context)->firstId();
+			return;
+        } else {
+			$context = $uninstallContext->getContext();
 
-        $tax_pro_criteria = new Criteria();
+			$connection = $this->container->get(Connection::class);
+	
+			$tax_repo = $this->container->get('tax_provider.repository');
 
-        $tax_pro_criteria->addFilter(new EqualsFilter('identifier', 'ZampTax\Checkout\Cart\Tax\ZampTax'));
-        
-        $tax_pro_id = $tax_repo->searchIds($tax_pro_criteria, $context)->firstId();
-        
-        if($tax_pro_id){
+			$rule_repo = $this->container->get('rule.repository');
 
-            $tax_repo->update([
-                [
-                    'id' => $tax_pro_id,
-                    'availabilityRuleId' => null
-                ]
-                ], $context);
-    
-            $tax_repo->delete([
-                [
-                    'id' => $tax_pro_id
-                ]
-            ], $context);
-        }
+			$rule_crit = new Criteria();
 
-        if($rule_id){
-            $rule_repo->delete([
-                [
-                    'id' => $rule_id
-                ]
-            ], $context);
-        }
+			$rule_crit->addFilter(new EqualsFilter('name', 'Zamp Rule'));
 
-        $schemaManager = method_exists($connection, 'createSchemaManager') ? $connection->createSchemaManager() : $connection->getSchemaManager();
-        $columns_one = $schemaManager->listTableColumns('customer_group');
-        $columns_two = $schemaManager->listTableColumns('product');
-    
-        if (array_key_exists('tax_exempt_code', $columns_one)) {
-            $connection->executeStatement('
-                ALTER TABLE `customer_group`
-                DROP COLUMN `tax_exempt_code`
-            ');
-        }
+			$rule_id = $rule_repo->searchIds($rule_crit, $context)->firstId();
 
-        if (array_key_exists('product_tax_code', $columns_two)) {
-            $connection->executeStatement('
-                ALTER TABLE `product`
-                DROP COLUMN `product_tax_code`
-            ');
-        }
+			$tax_pro_criteria = new Criteria();
 
-        $connection->executeStatement("DROP TABLE IF EXISTS `zamp_transactions`");
-        $connection->executeStatement("DROP TABLE IF EXISTS `zamp_product_tax_code`");
-        $connection->executeStatement("DROP TABLE IF EXISTS `zamp_settings`");
+			$tax_pro_criteria->addFilter(new EqualsFilter('identifier', 'ZampTax\Checkout\Cart\Tax\ZampTax'));
+			
+			$tax_pro_id = $tax_repo->searchIds($tax_pro_criteria, $context)->firstId();
+
+			// $zamp_settings_id = $zamp_settings->searchIds(new Criteria(), $uninstallContext)->firstId();
+			
+			
+			if($tax_pro_id){
+
+				$tax_repo->update([
+					[
+						'id' => $tax_pro_id,
+						'availabilityRuleId' => null
+					]
+					], $context);
+		
+				$tax_repo->delete([
+					[
+						'id' => $tax_pro_id
+					]
+				], $context);
+			}
+
+			if($rule_id){
+				$rule_repo->delete([
+					[
+						'id' => $rule_id
+					]
+				], $context);
+			}
+
+			// Drop the 'tax_exempt_code' column from the 'customer_group' table if it exists
+			$schemaManager = method_exists($connection, 'createSchemaManager') ? $connection->createSchemaManager() : $connection->getSchemaManager();
+			$columns_one = $schemaManager->listTableColumns('customer_group');
+			$columns_two = $schemaManager->listTableColumns('product');
+		
+			if (array_key_exists('tax_exempt_code', $columns_one)) {
+				$connection->executeStatement('
+					ALTER TABLE `customer_group`
+					DROP COLUMN `tax_exempt_code`
+				');
+			}
+
+			if (array_key_exists('product_tax_code', $columns_two)) {
+				$connection->executeStatement('
+					ALTER TABLE `product`
+					DROP COLUMN `product_tax_code`
+				');
+			}
+
+			// Disable foreign key checks to avoid errors
+			$connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0;');
+
+			$tables = [
+				'zamp_transactions',
+				'zamp_settings',
+				'zamp_product_tax_code'
+			];
+
+			foreach($tables as $table){
+				$connection->executeStatement("DROP TABLE IF EXISTS `$table`");
+			}
+
+			// Re-enable foreign key checks after dropping tables
+			$connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1;');
+		}
+
+		
+
+
+        // Remove or deactivate the data created by the plugin
     }
 
-    /**
-     * Handles plugin activation
-     * 
-     * @param ActivateContext $activateContext Activation context
-     */
     public function activate(ActivateContext $activateContext): void
     {
+        // Activate entities, such as a new payment method
+        // Or create new entities here, because now your plugin is installed and active for sure
     }
 
-    /**
-     * Handles plugin deactivation
-     * 
-     * @param DeactivateContext $deactivateContext Deactivation context
-     */
     public function deactivate(DeactivateContext $deactivateContext): void
     {
+        // Deactivate entities, such as a new payment method
+        // Or remove previously created entities
     }
 
-    /**
-     * Handles plugin updates
-     * 
-     * @param UpdateContext $updateContext Update context
-     */
     public function update(UpdateContext $updateContext): void
     {
+        // Update necessary stuff, mostly non-database related
     }
 
-    /**
-     * Executes after plugin installation
-     * 
-     * @param InstallContext $installContext Installation context
-     */
     public function postInstall(InstallContext $installContext): void
     {
     }
 
-    /**
-     * Executes after plugin update
-     * 
-     * @param UpdateContext $updateContext Update context
-     */
     public function postUpdate(UpdateContext $updateContext): void
     {
     }

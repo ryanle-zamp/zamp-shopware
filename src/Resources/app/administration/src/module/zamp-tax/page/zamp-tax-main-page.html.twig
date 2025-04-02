@@ -17,7 +17,7 @@
 						</div>
 						<div class="zamp-page__actions">
 							<p class="zamp-contact-text" id="prompt-text">{{ connected ? $tc('labels.quest') : $tc('labels.need') }}</p>
-							<a class="zamp-button button-link" id="contact-button" target="_blank" rel="noopener" href="https://zamp.com/platforms/shopware">{{ connected ? $tc('buttons.contact') : $tc('buttons.create') }}</a>
+							<a class="zamp-button button-link" id="contact-button" target="_blank" href="https://zamp.com/platforms/shopware">{{ connected ? $tc('buttons.contact') : $tc('buttons.create') }}</a>
 						</div>
 					</div>
 				</div>
@@ -88,7 +88,7 @@
 													<label for="zamp-token-input">{{ $tc('labels.token') }}</label>
 												</div>
 												<div class="zamp-field-input">
-													<input type="password" placeholder="{{ $tc('places.token') }}" maxlength="64" id="zamp-token-input" autocomplete="off">
+													<input type="password" :placeholder="$tc('places.token')" maxlength="64" id="zamp-token-input" autocomplete="off">
 												</div>
 											</div>
 										</div>
@@ -136,18 +136,6 @@
 														v-model="transEnabled"
 														:disabled="!connected"
 														:label="$tc('switches.send')"
-													></sw-switch-field>
-												</div>
-											</div>
-										</div>
-
-                                        <div class="zamp-retain-input-wrapper">
-											<div class="zamp-field" :label="$tc('switches.compress')">
-												<div id="zamp-retain-input" class="zamp-retain-input">
-													<sw-switch-field
-														v-model="retainLogs"
-														:disabled="!connected"
-														:label="$tc('switches.compress')"
 													></sw-switch-field>
 												</div>
 											</div>

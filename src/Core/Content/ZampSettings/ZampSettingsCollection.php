@@ -5,8 +5,6 @@ namespace ZampTax\Core\Content\ZampSettings;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
 
 /**
- * Collection of ZampSettings entities
- *
  * @method void               add(ZampSettingsEntity $entity)
  * @method void               set(string $key, ZampSettingsEntity $entity)
  * @method ZampSettingsEntity[]    getIterator()
@@ -15,13 +13,9 @@ use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
  * @method ZampSettingsEntity|null first()
  * @method ZampSettingsEntity|null last()
  */
+
 class ZampSettingsCollection extends EntityCollection
 {
-    /**
-     * Returns the entity class this collection contains
-     * 
-     * @return string
-     */
     protected function getExpectedClass(): string
     {
         return ZampSettingsEntity::class;

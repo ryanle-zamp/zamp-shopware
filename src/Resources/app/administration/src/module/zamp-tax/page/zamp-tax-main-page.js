@@ -19,7 +19,6 @@ Shopware.Component.register('zamp-tax-main-page', {
             paidOrders: [],
             calcEnabled: false,
 			transEnabled: false,
-			retainLogs: false,
             selectedStates: [],
             stateOptions: [
                 { code: 'AL', name: 'AL - Alabama' },
@@ -137,10 +136,6 @@ Shopware.Component.register('zamp-tax-main-page', {
                                 this.transEnabled = true;
                             }
 
-                            if(this.entity.retainLogs){
-                                this.retainLogs = true;
-                            }
-
                         } else {
                             this.entity = this.zampSettingsRepository.create(Shopware.Context.api);
                 
@@ -253,10 +248,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 					this.transEnabled = true;
 				}
 
-				if(this.entity.retainLogs){
-					this.retainLogs = true;
-				}
-
 			} else {
 				this.entity = this.zampSettingsRepository.create(Shopware.Context.api);
 	
@@ -322,9 +313,7 @@ Shopware.Component.register('zamp-tax-main-page', {
                 return;
             }
 
-            const fileName = `${selectedDate}_log.txt`;
-
-            const fileUrl = `/public/${fileName}`;
+            const fileUrl = `/var/log/ZampTax-${selectedDate}.log`;
 
             fetch(fileUrl).then(response => {
                 if(!response.ok){
@@ -392,9 +381,7 @@ Shopware.Component.register('zamp-tax-main-page', {
                 return;
             }
 
-            const fileName = `${selectedDate}_log.txt`;
-
-            const fileUrl = `/public/${fileName}`;
+            const fileUrl = `/var/log/ZampTax-${selectedDate}.log`;
 
             fetch(fileUrl).then(response => {
                 if(!response.ok){
@@ -678,7 +665,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 			this.calcEventListenersAdded = false;
 			this.transEventListenersAdded = false;
-			this.retainLogsEventAdded = false;
 
 			this.observer = new MutationObserver((mutationsList) => {
 				let elementFound = false;
@@ -725,28 +711,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 									}
 								});
 								this.transEventListenersAdded = true;
-							} 
-						} 
-
-						const retainParent = document.querySelector('#zamp-retain-input');
-
-						if (retainParent) {
-							
-							
-							const allDescendants = retainParent.querySelectorAll('*');
-							const retainInput = Array.from(allDescendants).find(el => el.id.startsWith('sw-field--'));
-
-							if (retainInput && !this.retainLogsEventAdded) {
-
-								retainInput.addEventListener('click', (e) => {
-
-									if(!this.retainLogs){
-										this.retainLogs = true;
-									} else {
-										this.retainLogs = false;
-									}
-								});
-								this.retainLogsEventAdded = true;
 							} 
 						} 
 
@@ -807,7 +771,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 			this.entity.taxableStates = states;
 			this.entity.calculationsEnabled = this.calcEnabled;
 			this.entity.transactionsEnabled = this.transEnabled;
-			this.entity.retainLogs = this.retainLogs;
 
 			this.zampSettingsRepository.save(this.entity, Shopware.Context.api)
 			.then(() => {
