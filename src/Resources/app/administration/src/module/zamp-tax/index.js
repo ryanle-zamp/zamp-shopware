@@ -1,4 +1,7 @@
 import './page/zamp-tax-main-page';
+import deDE from './snippet/de-DE';
+import enGB from './snippet/en-GB';
+import enUS from './snippet/en-US';
 
 Shopware.Module.register('zamp-tax', {
 	type: 'plugin',
@@ -8,9 +11,9 @@ Shopware.Module.register('zamp-tax', {
 	color: '#5075d3',
 	icon: 'default-action-settings',
 	snippets: {
-		'de-DE': require('./snippet/de-DE.json'),
-		'en-GB': require('./snippet/en-GB.json'),
-		'en-US': require('./snippet/en-GB.json'),
+		'de-DE': deDE,
+		'en-GB': enGB,
+		'en-US': enUS,
 	},
 	routes: {
 		dashboard: {
