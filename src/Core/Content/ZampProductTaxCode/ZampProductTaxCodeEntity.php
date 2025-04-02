@@ -43,7 +43,7 @@ class ZampProductTaxCodeEntity extends Entity
      */
     public function setProductId(?string $productId): void
     {
-        this->productId = $productId;
+        $this->productId = $productId;
     }
 
     /**

@@ -580,5 +580,7 @@ class ZampController extends AbstractController
                 }
             }
         }
+        
+        return new JsonResponse(['success' => false, 'message' => 'Operation could not be completed']);
     }
 }

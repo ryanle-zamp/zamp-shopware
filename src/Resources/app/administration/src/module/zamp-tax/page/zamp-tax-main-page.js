@@ -85,7 +85,118 @@ Shopware.Component.register('zamp-tax-main-page', {
 	},
 
     watch: {
-        selectedStates: 'updateSelectedStates'
+        selectedStates: 'updateSelectedStates',
+        activeTab(newTab){
+            if (newTab == 'settings'){
+                this.$nextTick(() => {
+                    const apiForm = document.getElementById('zamp-token-form');
+                    const settingsForm = document.getElementById('zamp-settings-form');
+
+                    console.log(apiForm);
+
+                    if(apiForm){
+                        apiForm.addEventListener('submit', (e) => {
+                            this.testToken(e);
+                        });
+                    }
+                    if(settingsForm){
+                        settingsForm.addEventListener('submit', (e) => {
+                            this.saveConfig(e);
+                        });
+                    }
+
+                    const randomHexUuid = Shopware.Utils.createId();
+
+                    const criteria = new Shopware.Data.Criteria();
+
+                    this.zampSettingsRepository.search(criteria, Shopware.Context.api).then(result => {
+
+                        if(result.length > 0){
+
+                            this.entity = result.first();
+
+                            this.entityId = result.first().id;
+
+                            if(this.entity.apiToken !== null){
+
+                                document.querySelector('#zamp-token-input').value = this.entity.apiToken;
+                                document.querySelector('#small-disclaimer-text').classList.add('green-text');
+                                this.connected = true;
+
+                            }
+
+                            if(this.entity.taxableStates !== null){
+                                this.selectedStates = this.entity.taxableStates.split(',');
+                            }
+
+                            if(this.entity.calculationsEnabled){
+                                this.calcEnabled = true;
+                            }
+
+                            if(this.entity.transactionsEnabled){
+                                this.transEnabled = true;
+                            }
+
+                            if(this.entity.retainLogs){
+                                this.retainLogs = true;
+                            }
+
+                        } else {
+                            this.entity = this.zampSettingsRepository.create(Shopware.Context.api);
+                
+                            this.entity.id = randomHexUuid;
+
+                            this.entityId = randomHexUuid;
+
+                            console.log(this.entity.id);
+                
+                            this.zampSettingsRepository.save(this.entity, Shopware.Context.api);
+                        }
+                    });
+                });
+
+                this.observeDOM();	
+            }
+            else if (newTab === 'historicalSync') {
+                this.$nextTick(() => {
+                    const syncForm = document.getElementById('historical-data-form');
+                    document.querySelector('#small-warning-text').innerText = '';
+
+                    if(syncForm){
+                        syncForm.addEventListener('submit', (e) => {
+                            this.syncHistory(e);
+                        });
+                    }
+                });
+            }
+            else if (newTab === 'errorLogs'){
+                this.$nextTick(() => {
+                    const logsForm = document.getElementById('zamp-logs-form');
+                    document.querySelector('#small-logs-text').innerText = '';
+
+                    if(logsForm){
+                        logsForm.addEventListener('submit', (e) => {
+                            this.loadLog(e);
+                        });
+
+                        const dateInput = document.getElementById('zamp-logs-date-input');
+
+                        const today = new Date().toISOString().split('T')[0];
+                        dateInput.value = today;
+
+                        var jsPDFScript = document.createElement("script");
+                        jsPDFScript.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+                        document.head.appendChild(jsPDFScript);
+
+                        const logDownload = document.getElementById('logs-down-button');
+
+                        logDownload.addEventListener('click', (e) => {
+                            this.downloadLog(e);
+                        })
+                    }
+                });
+            }
+        }
     },
 
 	computed: {
@@ -164,121 +275,6 @@ Shopware.Component.register('zamp-tax-main-page', {
         
 		
     },
-	watch: {
-		activeTab(newTab){
-			if (newTab == 'settings'){
-				this.$nextTick(() => {
-					const apiForm = document.getElementById('zamp-token-form');
-					const settingsForm = document.getElementById('zamp-settings-form');
-
-					console.log(apiForm);
-
-					if(apiForm){
-						apiForm.addEventListener('submit', (e) => {
-							this.testToken(e);
-						});
-					}
-					if(settingsForm){
-						settingsForm.addEventListener('submit', (e) => {
-							this.saveConfig(e);
-						});
-					}
-
-					const randomHexUuid = Shopware.Utils.createId();
-
-					const criteria = new Shopware.Data.Criteria();
-
-					this.zampSettingsRepository.search(criteria, Shopware.Context.api).then(result => {
-
-						if(result.length > 0){
-
-							this.entity = result.first();
-
-							this.entityId = result.first().id;
-
-							if(this.entity.apiToken !== null){
-
-								document.querySelector('#zamp-token-input').value = this.entity.apiToken;
-								document.querySelector('#small-disclaimer-text').classList.add('green-text');
-								this.connected = true;
-
-							}
-
-							if(this.entity.taxableStates !== null){
-								this.selectedStates = this.entity.taxableStates.split(',');
-							}
-
-							if(this.entity.calculationsEnabled){
-								this.calcEnabled = true;
-							}
-
-							if(this.entity.transactionsEnabled){
-								this.transEnabled = true;
-							}
-
-							if(this.entity.retainLogs){
-								this.retainLogs = true;
-							}
-
-						} else {
-							this.entity = this.zampSettingsRepository.create(Shopware.Context.api);
-				
-							this.entity.id = randomHexUuid;
-
-							this.entityId = randomHexUuid;
-
-							console.log(this.entity.id);
-				
-							this.zampSettingsRepository.save(this.entity, Shopware.Context.api);
-						}
-					});
-				});
-
-				this.observeDOM();	
-			}
-			else if (newTab === 'historicalSync') {
-				this.$nextTick(() => {
-					const syncForm = document.getElementById('historical-data-form');
-					document.querySelector('#small-warning-text').innerText = '';
-
-					if(syncForm){
-						syncForm.addEventListener('submit', (e) => {
-							this.syncHistory(e);
-						});
-					}
-						// Perform any operations you need with the form
-				});
-			}
-            else if (newTab === 'errorLogs'){
-                this.$nextTick(() => {
-                    const logsForm = document.getElementById('zamp-logs-form');
-                    document.querySelector('#small-logs-text').innerText = '';
-
-                    if(logsForm){
-                        logsForm.addEventListener('submit', (e) => {
-                            this.loadLog(e);
-                        });
-
-                        const dateInput = document.getElementById('zamp-logs-date-input');
-
-                        // Set default date to today's date
-                        const today = new Date().toISOString().split('T')[0]; // Format as YYYY-MM-DD
-                        dateInput.value = today;
-
-                        var jsPDFScript = document.createElement("script");
-                        jsPDFScript.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-                        document.head.appendChild(jsPDFScript);
-
-                        const logDownload = document.getElementById('logs-down-button');
-
-                        logDownload.addEventListener('click', (e) => {
-                            this.downloadLog(e);
-                        })
-                    }
-                });
-            }
-		}
-	},
 	mounted() {
 		const apiForm = document.getElementById('zamp-token-form');
 		const settingsForm = document.getElementById('zamp-settings-form');
@@ -345,9 +341,9 @@ Shopware.Component.register('zamp-tax-main-page', {
                     const lines = text.split('\n');
 
                     const margin = 15;
-                    const pageHeight = log_doc.internal.pageSize.height; // Get the page height
+                    const pageHeight = log_doc.internal.pageSize.height;
                     const pageWidth = log_doc.internal.pageSize.width;
-                    const lineHeight = 10; // Height of each line
+                    const lineHeight = 10;
 
                     log_doc.setFontSize(titleFontSize);
                     log_doc.text(title, margin, margin + titleFontSize);
@@ -361,8 +357,8 @@ Shopware.Component.register('zamp-tax-main-page', {
 
                         wrappedLines.forEach(wrap => {
                             if (y + lineHeight > pageHeight - margin) {
-                                log_doc.addPage(); // Add a new page
-                                y = margin; // Reset y position for the new page
+                                log_doc.addPage();
+                                y = margin;
                             }
                             log_doc.text(wrap, margin, y);
                             y += lineHeight;
@@ -484,7 +480,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 						const today = new Date();
 
 						const year = today.getFullYear();
-						const month = String(today.getMonth() + 1).padStart(2, '0'); // getMonth() returns 0-based month
+						const month = String(today.getMonth() + 1).padStart(2, '0');
 						const day = String(today.getDate()).padStart(2, '0');
 
 						const formattedDate = `${year}-${month}-${day} 23:59:59`;
@@ -493,7 +489,7 @@ Shopware.Component.register('zamp-tax-main-page', {
                         const today = new Date(end);
 
 						const year = today.getFullYear();
-						const month = String(today.getMonth() + 1).padStart(2, '0'); // getMonth() returns 0-based month
+						const month = String(today.getMonth() + 1).padStart(2, '0');
 						const day = String(today.getDate()).padStart(2, '0');
 
 						const formattedDate = `${year}-${month}-${day} 23:59:59`;
@@ -502,7 +498,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 					const crit = new Shopware.Data.Criteria();
 
-					criteria.addSorting(Criteria.sort('createdAt', 'DESC')); // Sort by highest auto_increment
+					criteria.addSorting(Criteria.sort('createdAt', 'DESC'));
 
 					this.orderRepository.search(crit, Shopware.Context.api).then((result) => {
 						const uniqueOrders = {};
@@ -516,11 +512,10 @@ Shopware.Component.register('zamp-tax-main-page', {
 						});
 
 
-						// Convert the unique orders object back to an array
     					const recentOrders = Object.values(uniqueOrders);
 
 						const filteredOrders = recentOrders.filter(ord => {
-							console.log("Raw Order: ", ord);  // Log the raw created_at value
+							console.log("Raw Order: ", ord);
 							const createdAt = new Date(ord.createdAt);
 							const startDate = new Date(start);
 							const endDate = new Date(end);
@@ -601,7 +596,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 					this.zampSettingsRepository.save(this.entity, Shopware.Context.api)
 					.then(() => {
-						// the entity is stateless, the data has be fetched from the server, if required
 						this.zampSettingsRepository
 							.get(this.entityId, Shopware.Context.api)
 							.then(entity => {
@@ -625,18 +619,17 @@ Shopware.Component.register('zamp-tax-main-page', {
 		},
 
         updateSelectedStates() {
-            const list = document.querySelector('.sw-select-selection-list__input');
+            const list = document.querySelector('.sw-select-selection-list');
 
 			
 
             if (list) {
-                // Clear the existing list items except the last input element
                 list.innerHTML = '';
                 this.selectedStates.forEach(state => {
 					console.log(state.code);
                     const listItem = document.createElement('li');
                     listItem.className = 'sw-select-selection-list__item-holder';
-                    listItem.dataset.id = state.code; // Assuming code is unique
+                    listItem.dataset.id = state.code;
 
                     const span = document.createElement('span');
                     span.className = 'sw-label sw-label--appearance-default sw-label--size-default sw-label--dismissable';
@@ -651,23 +644,14 @@ Shopware.Component.register('zamp-tax-main-page', {
                     captionSpan.appendChild(itemSpan);
                     span.appendChild(captionSpan);
 
-                    // Create remove button
                     const removeButton = document.createElement('button');
                     removeButton.className = 'sw-label__dismiss';
                     removeButton.title = 'Remove';
 					removeButton.setAttribute("data-state", state.code);
 
-					// Log the button creation and data attribute to verify
             		console.log('Button created for state:', state.code, 'Data attribute:', removeButton.getAttribute("data-state"));
 
-					// // Add event listener to remove button
-					// removeButton.addEventListener('click', () => {
-					// 	console.log("Clicked");
-					// 	// Remove state from selectedStates array
-					// 	this.selectedStates.splice(this.selectedStates.indexOf(state), 1);
 		
-					// 	list.removeChild(listItem);								
-					// });
 
                     const iconSpan = document.createElement('span');
                     iconSpan.className = 'sw-icon sw-icon--fill icon--regular-times-s';
@@ -682,7 +666,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 					
                 });
 
-                // Add an empty input at the end
                 const inputElement = document.createElement('li');
                 inputElement.innerHTML = '<input class="sw-select-selection-list__input" type="text" placeholder="" value="">';
                 list.appendChild(inputElement);
@@ -693,7 +676,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 			const targetNode = document.body;
 			const config = { childList: true, subtree: true };
 
-			// Store references to ensure event listeners are added only once
 			this.calcEventListenersAdded = false;
 			this.transEventListenersAdded = false;
 			this.retainLogsEventAdded = false;
@@ -706,16 +688,12 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 						if (calcParent) {
 							
-							// Select all descendant elements
 							
 							const allDescendants = calcParent.querySelectorAll('*');
-							// Find the first element whose ID starts with 'sw-field--'
 							const calcInput = Array.from(allDescendants).find(el => el.id.startsWith('sw-field--'));
 
-							// Log the found element
 							if (calcInput && !this.calcEventListenersAdded) {
 
-								// Add an event listener if the element is found
 								calcInput.addEventListener('click', (e) => {
 
 									if(!this.calcEnabled){
@@ -724,7 +702,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 										this.calcEnabled = false;
 									}
 								});
-								this.calcEventListenersAdded = true; // Ensure listeners are only added once
+								this.calcEventListenersAdded = true;
 							} 
 						} 
 
@@ -732,16 +710,12 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 						if (transParent) {
 							
-							// Select all descendant elements
 							
 							const allDescendants = transParent.querySelectorAll('*');
-							// Find the first element whose ID starts with 'sw-field--'
 							const transInput = Array.from(allDescendants).find(el => el.id.startsWith('sw-field--'));
 
-							// Log the found element
 							if (transInput && !this.transEventListenersAdded) {
 
-								// Add an event listener if the element is found
 								transInput.addEventListener('click', (e) => {
 
 									if(!this.transEnabled){
@@ -750,7 +724,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 										this.transEnabled = false;
 									}
 								});
-								this.transEventListenersAdded = true; // Ensure listeners are only added once
+								this.transEventListenersAdded = true;
 							} 
 						} 
 
@@ -758,16 +732,12 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 						if (retainParent) {
 							
-							// Select all descendant elements
 							
 							const allDescendants = retainParent.querySelectorAll('*');
-							// Find the first element whose ID starts with 'sw-field--'
 							const retainInput = Array.from(allDescendants).find(el => el.id.startsWith('sw-field--'));
 
-							// Log the found element
 							if (retainInput && !this.retainLogsEventAdded) {
 
-								// Add an event listener if the element is found
 								retainInput.addEventListener('click', (e) => {
 
 									if(!this.retainLogs){
@@ -776,7 +746,7 @@ Shopware.Component.register('zamp-tax-main-page', {
 										this.retainLogs = false;
 									}
 								});
-								this.retainLogsEventAdded = true; // Ensure listeners are only added once
+								this.retainLogsEventAdded = true;
 							} 
 						} 
 
@@ -841,7 +811,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 			this.zampSettingsRepository.save(this.entity, Shopware.Context.api)
 			.then(() => {
-				// the entity is stateless, the data has be fetched from the server, if required
 				this.createNotificationSuccess({
 					title: this.$tc('global.default.success'),
 					message: this.$tc('messages.success')
@@ -861,7 +830,7 @@ Shopware.Component.register('zamp-tax-main-page', {
  	},
 	beforeUnmount(){
 		if (this.observer) {
-            this.observer.disconnect(); // Stop observing
+            this.observer.disconnect();
         }
 	}
 });
