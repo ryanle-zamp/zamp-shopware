@@ -12,7 +12,7 @@ Shopware.Module.register('zamp-tax', {
 			component: 'zamp-tax-main-page',
 			path: 'dashboard',
 			meta: {
-                allow: ['user', 'admin'],  // Explicitly allow all users
+                allow: ['user', 'admin'],
             },
 		},
 	},

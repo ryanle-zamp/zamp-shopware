@@ -18,45 +18,45 @@ use Doctrine\DBAL\Connection;
 #[Route(defaults: ['_routeScope' => ['api']])]
 class ZampController extends AbstractController
 {
-	/**
-	 *
-	 * @var Connection
-	 */
+	 /** @var Connection Database connection service */
 	private $connection;
-	/**
-	 *
-	 * @var EntityRepository
-	 */
+
+	/** @var EntityRepository Order repository for accessing order data */
     private $orderRepository;
-	/**
-	 *
-	 * @var EntityRepository
-	 */
+
+	/** @var EntityRepository Zamp settings repository for accessing configuration */
 	private $zampSettingsRepository;
-	/**
-	 *
-	 * @var EntityRepository
-	 */
+
+	 /** @var EntityRepository Zamp transactions repository for tracking sync history */
 	private $zampTransactionsRepository;
 
+	/**
+     * Controller constructor
+     * 
+     * @param Connection $connection Database connection
+     * @param EntityRepository $orderRepository Order entity repository
+     * @param EntityRepository $zampSettingsRepository Zamp settings repository
+     * @param EntityRepository $zampTransactionsRepository Zamp transactions repository
+     */
 	public function __construct(Connection $connection, EntityRepository $orderRepository, EntityRepository $zampSettingsRepository, EntityRepository $zampTransactionsRepository)
-	{
-		$this->connection = $connection;
+    {
+        $this->connection = $connection;
         $this->orderRepository = $orderRepository;
-		$this->zampSettingsRepository = $zampSettingsRepository;
-		$this->zampTransactionsRepository = $zampTransactionsRepository;
-	}
+        $this->zampSettingsRepository = $zampSettingsRepository;
+        $this->zampTransactionsRepository = $zampTransactionsRepository;
+    }
 
-
+	/**
+     * Tests if the provided Zamp API token is valid
+     * 
+     * @return JsonResponse Response indicating if the token is valid
+     */
 	#[Route('/api/v1/_action/zamp-tax/test-api', name: 'api.zamp_tax.test_api', methods: ["POST", "GET"])]
 	public function testApiToken(): JsonResponse
 	{
-		// Set the timezone to Central Standard Time
         $timezone = new DateTimeZone('UTC');
 
 		$date = date('Y-m-d');
-
-        // Set the timezone to Central Standard Time
 
 		$token = $_POST['token'];
 		$valid = "";
@@ -112,7 +112,6 @@ class ZampController extends AbstractController
         ]);
 
         curl_setopt($curl, CURLOPT_HEADER, true);
-        // curl_setopt($curl, CURLOPT_NOBODY, true);
     
         $response = curl_exec($curl);
 
@@ -120,25 +119,15 @@ class ZampController extends AbstractController
 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 
-        // die(print_r($httpcode));
-
-		// if($err){
-		// 	die(print_r($err));
-		// }
-
         curl_close($curl);
 
         if($httpcode == 200){
-			// die(print("True!"));
             $valid = true;
 
-            // Create a new DateTime object
             $dateTime = new DateTime('now', $timezone);
-                    
-            // Format the date and time as needed
-            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
 
-            // Split the response into headers and body
+            $formattedTime = $dateTime->format('H:i:s');
+
             $responseParts = explode("\r\n\r\n", $response, 2);
             $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
             $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
@@ -149,16 +138,13 @@ class ZampController extends AbstractController
             fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody), JSON_PRETTY_PRINT));
 			fclose($hook_file);
         } else {
-			// die(print("False!"));
+
             $valid = false;
 
-            // Create a new DateTime object
             $dateTime = new DateTime('now', $timezone);
-                    
-            // Format the date and time as needed
-            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
 
-			// Split the response into headers and body
+            $formattedTime = $dateTime->format('H:i:s');
+
             $responseParts = explode("\r\n\r\n", $response, 2);
             $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
             $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
@@ -177,6 +163,11 @@ class ZampController extends AbstractController
         return new JsonResponse($data);
 	}
 
+	/**
+     * Retrieves Zamp plugin settings from the database
+     *
+     * @return array|false Settings array containing API token and configuration
+     */
 	public function getZampSettings()
     {
         $sql =  '
@@ -195,6 +186,12 @@ class ZampController extends AbstractController
         return $result;
     }
 
+	/**
+     * Retrieves Zamp product tax code for a specific product
+     *
+     * @param string $productId The product ID
+     * @return array|false Product tax code data
+     */
     public function getZampProductTaxCode($productId)
     {
         $sql =  '
@@ -337,11 +334,9 @@ class ZampController extends AbstractController
 
 		$order = $this->orderRepository->search($criteria, $context)->first();
 
-        // Create a new DateTime object
         $dateTime = new DateTime('now', $timezone);
                     
-        // Format the date and time as needed
-        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+        $formattedTime = $dateTime->format('H:i:s');
 
 		$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
 		fwrite($hook_file, "\n\n");
@@ -387,7 +382,6 @@ class ZampController extends AbstractController
 
 		}
 
-		// Format the date as "Y-m-d h:i:s"
 		$formattedDate = $order->createdAt->format('Y-m-d H:i:s');
 
 		if($trans_enabled && in_array($state, $taxable_states)){
@@ -442,11 +436,9 @@ class ZampController extends AbstractController
 
 			$zamp_obj = json_encode($zamp_json);
 
-            // Create a new DateTime object
             $dateTime = new DateTime('now', $timezone);
-                    
-            // Format the date and time as needed
-            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+
+            $formattedTime = $dateTime->format('H:i:s');
 
 			$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
 			fwrite($hook_file, "\n\n");
@@ -480,18 +472,16 @@ class ZampController extends AbstractController
 	
 			header("Access-Control-Allow-Origin: *");
 	
-			// die(print_r(json_decode($response3)));
 	
 			$err = curl_error($curl);
 	
 			curl_close($curl);
 	
 			if ($err){
-                // Create a new DateTime object
+
                 $dateTime = new DateTime('now', $timezone);
                                                     
-                // Format the date and time as needed
-                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                $formattedTime = $dateTime->format('H:i:s');
 
                 $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
                 fwrite($hook_file, "\n\n");
@@ -501,16 +491,13 @@ class ZampController extends AbstractController
 			} else {
 				if($response){
 
-                    // Split the response into headers and body
                     $responseParts = explode("\r\n\r\n", $response, 2);
                     $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
                     $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
 
-                    // Create a new DateTime object
                     $dateTime = new DateTime('now', $timezone);
-                            
-                    // Format the date and time as needed
-                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+
+                    $formattedTime = $dateTime->format('H:i:s');
 
 					$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
 					fwrite($hook_file, "\n\n");
@@ -547,8 +534,6 @@ class ZampController extends AbstractController
 
 					header("Access-Control-Allow-Origin: *");
 
-					// die(print_r(json_decode($response3)));
-
 					$err2 = curl_error($curl2);
 
 					curl_close($curl2);
@@ -557,11 +542,9 @@ class ZampController extends AbstractController
 
 					if ($err2){
 
-                        // Create a new DateTime object
                         $dateTime = new DateTime('now', $timezone);
-                                    
-                        // Format the date and time as needed
-                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+
+                        $formattedTime = $dateTime->format('H:i:s');
 
 						$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
 						fwrite($hook_file, "\n\n");
@@ -573,19 +556,15 @@ class ZampController extends AbstractController
 					} else {
 						if($response2){
 							
-
-                            // Split the response into headers and body
                             $responseParts2 = explode("\r\n\r\n", $response2, 2);
                             $httpResponseHeaders2 = isset($responseParts2[0]) ? $responseParts2[0] : '';
                             $jsonResponseBody2 = isset($responseParts2[1]) ? $responseParts2[1] : '';
 
                             $zamp_resp = json_decode($jsonResponseBody2);
 
-                            // Create a new DateTime object
                             $dateTime = new DateTime('now', $timezone);
-                                    
-                            // Format the date and time as needed
-                            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+
+                            $formattedTime = $dateTime->format('H:i:s');
 
                             $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
                             fwrite($hook_file, "\n\n");
@@ -607,5 +586,7 @@ class ZampController extends AbstractController
 				}
 			}
 		}
+
+		return new JsonResponse(['success' => false, 'message' => 'Operation could not be completed']);
 	}
 }

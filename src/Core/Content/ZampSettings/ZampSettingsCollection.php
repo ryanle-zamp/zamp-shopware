@@ -16,6 +16,11 @@ use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
 
 class ZampSettingsCollection extends EntityCollection
 {
+    /**
+     * Returns the entity class this collection contains
+     * 
+     * @return string
+     */
     protected function getExpectedClass(): string
     {
         return ZampSettingsEntity::class;

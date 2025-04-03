@@ -2,7 +2,6 @@
 
 namespace ZampTax\Checkout\Cart\Tax;
 
-// Add these use statements at the top of your PHP file
 use DateTime;
 use DateTimeZone;
 use Shopware\Core\Checkout\Cart\Cart;
@@ -240,11 +239,9 @@ class ZampTax extends AbstractTaxProvider
                 );				
             }
 
-            // Create a new DateTime object
             $dateTime = new DateTime('now', $timezone);
                 
-            // Format the date and time as needed
-            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+            $formattedTime = $dateTime->format('H:i:s');
 
 			$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
 			fwrite($hook_file, "\n\n");
@@ -330,11 +327,9 @@ class ZampTax extends AbstractTaxProvider
 
                 
                 
-                // Create a new DateTime object
                 $dateTime = new DateTime('now', $timezone);
                 
-                // Format the date and time as needed
-                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                $formattedTime = $dateTime->format('H:i:s');
 
 				$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
 				fwrite($hook_file, "\n\n");
@@ -368,19 +363,15 @@ class ZampTax extends AbstractTaxProvider
         
                 header("Access-Control-Allow-Origin: *");
         
-                // die(print_r(json_decode($response3)));
-        
                 $err = curl_error($curl);
         
                 curl_close($curl);
         
                 if ($err){
 
-                    // Create a new DateTime object
                     $dateTime = new DateTime('now', $timezone);
                                     
-                    // Format the date and time as needed
-                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                    $formattedTime = $dateTime->format('H:i:s');
 
                     $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
                     fwrite($hook_file, "\n\n");
@@ -391,13 +382,10 @@ class ZampTax extends AbstractTaxProvider
                 } else {
                     if($response){
 
-                        // Create a new DateTime object
                         $dateTime = new DateTime('now', $timezone);
                 
-                        // Format the date and time as needed
-                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                        $formattedTime = $dateTime->format('H:i:s');
 
-                        // Split the response into headers and body
                         $responseParts = explode("\r\n\r\n", $response, 2);
                         $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
                         $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
@@ -425,14 +413,12 @@ class ZampTax extends AbstractTaxProvider
                             $price = (float) number_format($line->amount * $line->quantity, 2, '.', '');
                             $taxes = (float) number_format($line_tax, 2, '.', '');
     
-                            // shopware will look for the `uniqueIdentifier` property of the lineItem to identify this lineItem even in nested-line-item structures
                             $lineItemTaxes[$item->getUniqueIdentifier()] = new CalculatedTaxCollection(
                                 [
                                     new CalculatedTax($taxes, $taxRate, $price),
                                 ]
                             );
 
-                            // shopware will look for the `uniqueIdentifier` property of the lineItem to identify this lineItem even in nested-line-item structures
                             $cartPriceTaxes[$item->getUniqueIdentifier()] = new CalculatedTaxCollection(
                                 [
                                     new CalculatedTax($taxes, $taxRate, $price),
@@ -441,11 +427,9 @@ class ZampTax extends AbstractTaxProvider
     
                         }
 
-                        // Create a new DateTime object
                         $dateTime = new DateTime('now', $timezone);
                         
-                        // Format the date and time as needed
-                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+                        $formattedTime = $dateTime->format('H:i:s');
 
 						$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
 						fwrite($hook_file, "\n\n");
@@ -462,7 +446,6 @@ class ZampTax extends AbstractTaxProvider
                     $price = $lineItem->getPrice()->getTotalPrice();
                     $taxes = 0;
         
-                    // shopware will look for the `uniqueIdentifier` property of the lineItem to identify this lineItem even in nested-line-item structures
                     $lineItemTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
                         [
                             new CalculatedTax($taxes, $taxRate, $price),
@@ -474,19 +457,11 @@ class ZampTax extends AbstractTaxProvider
                             new CalculatedTax($taxes, $taxRate, $price),
                         ]
                     );
-
-                    // $lineItemTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
-                    //     [
-                    //         new CalculatedTax($taxes, $taxRate, $price),
-                    //     ]
-                    // );
                 }
 
-                // Create a new DateTime object
                 $dateTime = new DateTime('now', $timezone);
-                
-                // Format the date and time as needed
-                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+
+                $formattedTime = $dateTime->format('H:i:s');
 
 				$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
 				fwrite($hook_file, "\n\n");
@@ -499,7 +474,6 @@ class ZampTax extends AbstractTaxProvider
        
         return new TaxProviderResult(
             $lineItemTaxes,
-            // $deliveryTaxes,
             $cartPriceTaxes
         );
     }
