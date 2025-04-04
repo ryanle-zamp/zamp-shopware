@@ -5,7 +5,8 @@ Shopware.Component.register('zamp-tax-main-page', {
 	template,
 
 	inject: [
-		'repositoryFactory'
+		'repositoryFactory',
+		'httpClient'
 	],
 
 	data: function() {
@@ -288,113 +289,112 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 	},
 	methods: {
-        downloadLog(e){
+        downloadLog(e) {
+			e.preventDefault();
+		
+			const { jsPDF } = window.jspdf;
+			const log_doc = new jsPDF();
+		
+			const dateValue = document.getElementById('zamp-logs-date-input');
+			const logsUI = document.getElementById('logs-ui');
+			const selectedDate = dateValue.value;
+		
+			if (!selectedDate) {
+				logsUI.textContent = this.$tc('messages.date');
+				return;
+			}
 
-            e.preventDefault(e);
+			const bearerToken = Shopware.Context.api.authToken.access;
+		
+			Shopware.Application.getContainer('init').httpClient
+				.get(`/v1/_action/zamp-tax/logs?date=${selectedDate}`, {
+					headers: {
+						Authorization: `Bearer ${bearerToken}`
+					}
+				}, Shopware.Context.api)
+				.then((response) => {
+					logsUI.textContent = this.$tc('messages.init');
+		
+					if (!response.data.log) {
+						logsUI.textContent = this.$tc('errors.log');
+						return;
+					}
+		
+					const titleFontSize = 16;
+					const title = `Zamp Shopware Log ${selectedDate}`;
+					const parser = new DOMParser();
+					const decodedLog = parser.parseFromString(response.data.log, 'text/html').documentElement.textContent;
+					const lines = decodedLog.split('\n');
 
-            const { jsPDF } = window.jspdf;
+		
+					const margin = 15;
+					const pageHeight = log_doc.internal.pageSize.height;
+					const pageWidth = log_doc.internal.pageSize.width;
+					const lineHeight = 10;
+		
+					log_doc.setFontSize(titleFontSize);
+					log_doc.text(title, margin, margin + titleFontSize);
+					log_doc.setFontSize(12);
+		
+					let y = margin + titleFontSize + 5;
+		
+					lines.forEach((line) => {
+						const wrappedLines = log_doc.splitTextToSize(line, pageWidth - 2 * margin);
+						wrappedLines.forEach((wrap) => {
+							if (y + lineHeight > pageHeight - margin) {
+								log_doc.addPage();
+								y = margin;
+							}
+							log_doc.text(wrap, margin, y);
+							y += lineHeight;
+						});
+					});
+		
+					log_doc.save(`Zamp-Shopware-log-${selectedDate}.pdf`);
+				})
+				.catch((error) => {
+					logsUI.textContent = this.$tc('errors.log');
+					console.error('Error fetching log for download: ', error);
+				});
+		},
+		
+		
+		loadLog(e) {
+			e.preventDefault();
+		
+			const dateValue = document.getElementById('zamp-logs-date-input');
+			const logsUI = document.getElementById('logs-ui');
+			const selectedDate = dateValue.value;
+		
+			if (!selectedDate) {
+				logsUI.textContent = this.$tc('messages.date');
+				return;
+			}
 
-            const log_doc = new jsPDF();
-
-
-
-            
-
-            const dateValue = document.getElementById('zamp-logs-date-input');
-
-            const logsUI = document.getElementById('logs-ui');
-
-            const selectedDate = dateValue.value;
-
-            console.log(selectedDate);
-
-            if(!selectedDate){
-                logsUI.textContent = this.$tc('messages.date');
-                return;
-            }
-
-            const fileUrl = `/var/log/ZampTax-${selectedDate}.log`;
-
-            fetch(fileUrl).then(response => {
-                if(!response.ok){
-                    throw new Error('Network response was not ok.');
-                }
-                return response.text();
-            }).then(text => {
-                    logsUI.textContent = this.$tc('messages.init');
-
-                    const titleFontSize = 16;
-
-                    const title = `Zamp Shopware Log ${selectedDate}`;
-
-                    const lines = text.split('\n');
-
-                    const margin = 15;
-                    const pageHeight = log_doc.internal.pageSize.height;
-                    const pageWidth = log_doc.internal.pageSize.width;
-                    const lineHeight = 10;
-
-                    log_doc.setFontSize(titleFontSize);
-                    log_doc.text(title, margin, margin + titleFontSize);
-
-                    log_doc.setFontSize(12);
-
-                    let y = margin + titleFontSize + 5;
-
-                    lines.forEach(line => {
-                        const wrappedLines = log_doc.splitTextToSize(line, pageWidth - 2 * margin);
-
-                        wrappedLines.forEach(wrap => {
-                            if (y + lineHeight > pageHeight - margin) {
-                                log_doc.addPage();
-                                y = margin;
-                            }
-                            log_doc.text(wrap, margin, y);
-                            y += lineHeight;
-                        })
-                        
-                    });
-
-                    log_doc.save(`Zamp-Shopware-log-${selectedDate}.pdf`);
-
-            }).catch(error => {
-                logsUI.textContent = this.$tc('errors.log');
-                console.error('Error fetching file content: ', error);
-            });
-
-        },
-        loadLog(e){
-
-            e.preventDefault();
-
-            console.log("loadLog function entered");
-
-            const dateValue = document.getElementById('zamp-logs-date-input');
-            const logsUI = document.getElementById('logs-ui');
-            
-            const selectedDate = dateValue.value;
-
-            console.log(selectedDate);
-
-            if(!selectedDate){
-                logsUI.textContent = this.$tc('messages.date');
-                return;
-            }
-
-            const fileUrl = `/var/log/ZampTax-${selectedDate}.log`;
-
-            fetch(fileUrl).then(response => {
-                if(!response.ok){
-                    throw new Error('Network response was not ok.');
-                }
-                return response.text();
-            }).then(text => {
-                    logsUI.innerHTML = `<pre>${text}</pre>`;
-            }).catch(error => {
-                logsUI.textContent = this.$tc('errors.log');
-                console.error('Error fetching file content: ', error);
-            });
-        },
+			const bearerToken = Shopware.Context.api.authToken.access;
+		
+			Shopware.Application.getContainer('init').httpClient.get(
+				`/v1/_action/zamp-tax/logs?date=${selectedDate}`,
+				{
+					headers: {
+						Authorization: `Bearer ${bearerToken}`
+					}
+				},
+				Shopware.Context.api
+			).then((response) => {
+				logsUI.innerHTML = `<pre>${response.data.log}</pre>`;
+			}).catch((error) => {
+				logsUI.textContent = this.$tc('errors.log');
+				console.error('Error fetching file content:', error);
+			
+				// 🔍 Extra debug logging
+				if (error.response && error.response.data) {
+					console.log('Backend error message:', error.response.data.message);
+					console.log('Full backend response:', error.response.data);
+				}
+			});
+			
+		},		
 
 		onTabChange(tab){
 			this.activeTab = tab;			

@@ -4,6 +4,7 @@ namespace ZampTax\Checkout\Cart\Tax;
 
 use DateTime;
 use DateTimeZone;
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Cart\Cart;
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
@@ -28,10 +29,16 @@ class ZampTax extends AbstractTaxProvider
 	 */
 	private $snippetService;
 
-    public function __construct(Connection $connection, SnippetService $snippetService)
+    public function __construct(Connection $connection, SnippetService $snippetService, LoggerInterface $ZampTaxLogger)
     {
         $this->connection = $connection;
 		$this->snippetService = $snippetService;
+        $this->logger = $ZampTaxLogger;
+    }
+
+    private function log(string $message, $context = []): void
+    {
+        $this->logger->info($message, $context);
     }
 
     public function getZampSettings()
@@ -243,11 +250,9 @@ class ZampTax extends AbstractTaxProvider
                 
             $formattedTime = $dateTime->format('H:i:s');
 
-			$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-			fwrite($hook_file, "\n\n");
-			fwrite($hook_file, $formattedTime . " - CART PRICE TAXES GENERATED W/O ZAMP CALCULATION.\n");
-            fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
-			fclose($hook_file);	
+			$this->log("{$formattedTime} - CART PRICE TAXES GENERATED W/O ZAMP CALCULATION.", [
+                'cart_price_taxes' => $cartPriceTaxes
+            ]);	
         } else {
 
             if(!empty($cart->getDeliveries())){
@@ -331,11 +336,9 @@ class ZampTax extends AbstractTaxProvider
                 
                 $formattedTime = $dateTime->format('H:i:s');
 
-				$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-				fwrite($hook_file, "\n\n");
-				fwrite($hook_file, $formattedTime . " - INITIAL REQUEST FOR ZAMP CALCULATION GENERATED.\n ");
-                fwrite($hook_file, "REQUEST: " . json_encode($zamp_json, JSON_PRETTY_PRINT));
-				fclose($hook_file);	
+				$this->log("{$formattedTime} - INITIAL REQUEST FOR ZAMP CALCULATION GENERATED.", [
+                    'request' => $zamp_json
+                ]);	
     
                 $curl = curl_init();
             
@@ -373,11 +376,9 @@ class ZampTax extends AbstractTaxProvider
                                     
                     $formattedTime = $dateTime->format('H:i:s');
 
-                    $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                    fwrite($hook_file, "\n\n");
-                    fwrite($hook_file, $formattedTime . " - ERROR IN RESPONSE FROM ZAMP CALCULATION.\n");
-                    fwrite($hook_file, "ERROR: " . $err);
-                    fclose($hook_file);
+                    $this->log("{$formattedTime} - ERROR IN RESPONSE FROM ZAMP CALCULATION.", [
+                        'error' => $err
+                    ]);
 					
                 } else {
                     if($response){
@@ -390,11 +391,10 @@ class ZampTax extends AbstractTaxProvider
                         $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
                         $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
 
-						$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-						fwrite($hook_file, "\n\n");
-						fwrite($hook_file, $formattedTime . " - INITIAL RESPONSE FROM ZAMP CALCULATION - " . strtok($httpResponseHeaders, "\r\n") . "\n");
-                        fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody), JSON_PRETTY_PRINT));
-						fclose($hook_file);	
+                        $this->log("{$formattedTime} - INITIAL RESPONSE FROM ZAMP CALCULATION.", [
+                            'status' => strtok($httpResponseHeaders, "\r\n"),
+                            'response' => json_decode($jsonResponseBody, true)
+                        ]);
 
                         $zamp_resp = json_decode($jsonResponseBody);
     
@@ -431,11 +431,9 @@ class ZampTax extends AbstractTaxProvider
                         
                         $formattedTime = $dateTime->format('H:i:s');
 
-						$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-						fwrite($hook_file, "\n\n");
-						fwrite($hook_file, $formattedTime . " - CART PRICE TAXES GENERATED WITH ZAMP CALCULATION. \n");
-                        fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
-						fclose($hook_file);	
+						$this->log("{$formattedTime} - CART PRICE TAXES GENERATED WITH ZAMP CALCULATION.", [
+                            'cart_price_taxes' => $cartPriceTaxes
+                        ]);
                     }
                 }    
                     
@@ -463,14 +461,11 @@ class ZampTax extends AbstractTaxProvider
 
                 $formattedTime = $dateTime->format('H:i:s');
 
-				$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-				fwrite($hook_file, "\n\n");
-				fwrite($hook_file, $formattedTime . " - CART PRICE TAXES GENERATED WITH NON-TAXABLE ZAMP CALCULATION.\n");
-                fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
-				fclose($hook_file);
+				$this->log("{$formattedTime} - CART PRICE TAXES GENERATED WITH NON-TAXABLE ZAMP CALCULATION.", [
+                    'cart_price_taxes' => $cartPriceTaxes
+                ]);
             }
-        }
-        
+        }        
        
         return new TaxProviderResult(
             $lineItemTaxes,

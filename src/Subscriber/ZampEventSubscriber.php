@@ -5,6 +5,7 @@ namespace ZampTax\Subscriber;
 use stdClass;
 use DateTime;
 use DateTimeZone;
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionEntity;
 use ZampTax\Core\Content\ZampTransactions\ZampTransactionsEntity;
@@ -34,6 +35,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
     private $zampTransactionsRepository;
 	/** @var EntityRepository */
     private $taxProviderRepository;
+    private LoggerInterface $logger;
 
     /**
      * Constructor
@@ -43,13 +45,15 @@ class ZampEventSubscriber implements EventSubscriberInterface
      * @param EntityRepository $orderTransactionRepository Order transaction repository
      * @param EntityRepository $zampTransactionsRepository Zamp transactions repository
      * @param EntityRepository $taxProviderRepository Tax provider repository
+     * @param LoggerInterface $zampTaxLogger
      */
     public function __construct(
 		Connection $connection,
 		EntityRepository $orderRepository, 
 		EntityRepository $orderTransactionRepository,
         EntityRepository $zampTransactionsRepository, 	
-        EntityRepository $taxProviderRepository	
+        EntityRepository $taxProviderRepository,
+        LoggerInterface $logger	
 	)
     {
         $this->connection = $connection;
@@ -57,6 +61,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
 		$this->orderTransactionRepository = $orderTransactionRepository;
         $this->zampTransactionsRepository = $zampTransactionsRepository;
         $this->taxProviderRepository = $taxProviderRepository;
+        $this->logger = $logger;
     }
 
     /**
@@ -183,8 +188,8 @@ class ZampEventSubscriber implements EventSubscriberInterface
      * @param string $orderId Order ID
      * @return string JSON string with transaction information
      */
-    public function get_trans_info(string $orderId): string {
-
+    public function get_trans_info(string $orderId): string
+    {
         $timezone = new DateTimeZone('UTC');
 
         $criteria = new Criteria();
@@ -194,15 +199,14 @@ class ZampEventSubscriber implements EventSubscriberInterface
         $result = $this->zampTransactionsRepository->search($criteria, Context::createDefaultContext());
 
         $dateTime = new DateTime('now', $timezone);
-
         $formattedTime = $dateTime->format('H:i:s');
 
-        $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-        fwrite($hook_file, "\n\n");
-        fwrite($hook_file, $formattedTime . " - ORDER RESULT LOCATED.\n");
-        fwrite($hook_file, "RESULT: " . json_encode($result, JSON_PRETTY_PRINT));
-        fclose($hook_file);
-    
+        $this->logger->info("{$formattedTime} - ORDER RESULT LOCATED.", [
+            'orderId' => $orderId,
+            'resultCount' => $result->count(),
+            'resultData' => $result
+        ]);
+
         if ($result->count() > 0) {
             $transaction = $result->first();
 
@@ -221,6 +225,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
         ]);
     }
 
+
     /**
      * Event handler for when an order is written
      *
@@ -228,26 +233,21 @@ class ZampEventSubscriber implements EventSubscriberInterface
      */
     public function onOrderWritten(EntityWrittenEvent $event): void
     {
+        $timezone = new DateTimeZone('UTC');
+        $dateTime = new DateTime('now', $timezone);
+        $formattedTime = $dateTime->format('H:i:s');
 
         foreach ($event->getWriteResults() as $result) {
             $payload = $result->getPayload();
 
             if (isset($payload['id'])) {
-
-				$timezone = new DateTimeZone('UTC');
-
-				$dateTime = new DateTime('now', $timezone);
-                                    
-				$formattedTime = $dateTime->format('H:i:s');
-
-				$hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-				fwrite($hook_file, "\n\n");
-				fwrite($hook_file, $formattedTime . " - ORDER WRITTEN EVENT OCCURRED.\n");
-				fwrite($hook_file, "EVENT PAYLOAD: " . json_encode($payload, JSON_PRETTY_PRINT));
-				fclose($hook_file);
+                $this->logger->info("{$formattedTime} - ORDER WRITTEN EVENT OCCURRED.", [
+                    'eventPayload' => $payload
+                ]);
             }
         }
     }
+
 
     /**
      * Event handler for when an order is deleted
@@ -256,253 +256,169 @@ class ZampEventSubscriber implements EventSubscriberInterface
      */
     public function onOrderDeleted(EntityDeletedEvent $event): void
     {
-        if($this->getTaxProviderActiveStatus()){
+        if (!$this->getTaxProviderActiveStatus()) {
+            return;
+        }
 
-            $timezone = new DateTimeZone('UTC');
+        $timezone = new DateTimeZone('UTC');
+        $zamp_settings = $this->getZampSettings();
+        $bear_token = $zamp_settings['api_token'];
 
-            $zamp_settings = $this->getZampSettings();
+        foreach ($event->getWriteResults() as $result) {
+            $payload = $result->getPayload();
+            $context = $event->getContext();
 
-            $bear_token = $zamp_settings['api_token'];
+            if (!isset($payload['id'])) {
+                continue;
+            }
 
-            foreach ($event->getWriteResults() as $result) {
-                $payload = $result->getPayload();
+            $versionId = $payload['versionId'];
 
-                $context = $event->getContext();
+            foreach ($event->getIds() as $orderId) {
+                $transaction_info = $this->get_trans_info($orderId);
+                $transInfo = json_decode($transaction_info);
 
-                if (isset($payload['id'])) {
+                if (!$transInfo->found || $transInfo->version !== $versionId) {
+                    continue;
+                }
 
-                    $versionId = $payload['versionId'];
+                $this->logger->info('ORDER DELETED EVENT OCCURRED.', [
+                    'payload' => $payload,
+                    'transaction_info' => $transInfo
+                ]);
 
-                    foreach($event->getIds() as $i){
-                        $orderId = $i;	                
+                $suffix = $transInfo->suffix;
+                $dataId = $transInfo->id;
+                $origin_id = "SW-{$orderId}-{$suffix}";
+                $origin_url = "https://api.zamp.com/transactions/{$origin_id}";
 
-                        $transaction_info = $this->get_trans_info($orderId);
+                // Retrieve original transaction
+                $curl = curl_init();
+                curl_setopt_array($curl, [
+                    CURLOPT_URL => $origin_url,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_ENCODING => "",
+                    CURLOPT_MAXREDIRS => 10,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    CURLOPT_CUSTOMREQUEST => "GET",
+                    CURLOPT_HTTPHEADER => [
+                        "Accept: application/json",
+                        "Content-Type: application/json",
+                        "Authorization: Bearer {$bear_token}"
+                    ],
+                    CURLOPT_HEADER => true
+                ]);
+                $response_origin = curl_exec($curl);
+                $err_origin = curl_error($curl);
+                curl_close($curl);
 
-                        if(json_decode($transaction_info)->found && json_decode($transaction_info)->version == $versionId){
+                if ($err_origin) {
+                    $this->logger->error('Error retrieving original transaction from Zamp.', [
+                        'error' => $err_origin,
+                        'url' => $origin_url
+                    ]);
+                    continue;
+                }
 
-                            $dateTime = new DateTime('now', $timezone);
+                [$headers_origin, $body_origin] = explode("\r\n\r\n", $response_origin, 2);
+                $statusLine_origin = strtok($headers_origin, "\r\n");
 
-                            $formattedTime = $dateTime->format('H:i:s');
+                $this->logger->info('Deleted order event response from Zamp original transaction retrieval.', [
+                    'http_status' => $statusLine_origin,
+                    'response' => json_decode($body_origin, true)
+                ]);
 
-                            $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                            fwrite($hook_file, "\n\n");
-                            fwrite($hook_file, $formattedTime . " - ORDER DELETED EVENT OCCURRED.\n");
-                            fwrite($hook_file, "EVENT PAYLOAD: " . json_encode($payload, JSON_PRETTY_PRINT));
-                            fclose($hook_file);
-                            
-                            $suffix = json_decode($transaction_info)->suffix;
+                // Delete original transaction
+                $curl = curl_init();
+                curl_setopt_array($curl, [
+                    CURLOPT_URL => $origin_url,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_ENCODING => "",
+                    CURLOPT_MAXREDIRS => 10,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    CURLOPT_CUSTOMREQUEST => "DELETE",
+                    CURLOPT_HTTPHEADER => [
+                        "Accept: application/json",
+                        "Content-Type: application/json",
+                        "Authorization: Bearer {$bear_token}"
+                    ],
+                    CURLOPT_HEADER => true
+                ]);
+                $response_del = curl_exec($curl);
+                $err_del = curl_error($curl);
+                curl_close($curl);
 
-                            $status = json_decode($transaction_info)->status;
+                if ($err_del) {
+                    $this->logger->error('Error deleting order from Zamp.', [
+                        'error' => $err_del,
+                        'url' => $origin_url
+                    ]);
+                } else {
+                    [$headers_del, $body_del] = explode("\r\n\r\n", $response_del, 2);
+                    $statusLine_del = strtok($headers_del, "\r\n");
 
-                            $dataId = json_decode($transaction_info)->id;
+                    $this->logger->info('Order deleted response from Zamp.', [
+                        'http_status' => $statusLine_del,
+                        'response' => json_decode($body_del, true)
+                    ]);
+                }
 
-                            $origin_id = "SW-" . $orderId . "-" . $suffix;
+                // If multiple suffixed transactions exist, delete them
+                if ($suffix !== "01") {
+                    $suffend = (int) $suffix;
 
-                            $curl_origin = curl_init();
+                    for ($i = 1; $i < $suffend; $i++) {
+                        $suffstring = str_pad((string) $i, 2, "0", STR_PAD_LEFT);
+                        $next_id = "SW-{$orderId}-{$suffstring}";
+                        $next_url = "https://api.zamp.com/transactions/{$next_id}";
 
-                            $url_origin = 'https://api.zamp.com/transactions/' . $origin_id;
-
-                            curl_setopt_array($curl_origin, [
-                                CURLOPT_URL => $url_origin,
-                                CURLOPT_RETURNTRANSFER => true,
-                                CURLOPT_ENCODING => "",
-                                CURLOPT_MAXREDIRS => 10,
-                                CURLOPT_TIMEOUT => 30,
-                                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                                CURLOPT_CUSTOMREQUEST => "GET",
-                                CURLOPT_HTTPHEADER => [
+                        $curl = curl_init();
+                        curl_setopt_array($curl, [
+                            CURLOPT_URL => $next_url,
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_ENCODING => "",
+                            CURLOPT_MAXREDIRS => 10,
+                            CURLOPT_TIMEOUT => 30,
+                            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                            CURLOPT_CUSTOMREQUEST => "DELETE",
+                            CURLOPT_HTTPHEADER => [
                                 "Accept: application/json",
                                 "Content-Type: application/json",
-                                "Authorization: Bearer " . $bear_token
-                                ],
+                                "Authorization: Bearer {$bear_token}"
+                            ],
+                            CURLOPT_HEADER => true
+                        ]);
+                        $response_next = curl_exec($curl);
+                        $err_next = curl_error($curl);
+                        curl_close($curl);
+
+                        if ($err_next) {
+                            $this->logger->error('Error deleting previous transaction from Zamp.', [
+                                'error' => $err_next,
+                                'url' => $next_url
                             ]);
+                        } else {
+                            [$headers_next, $body_next] = explode("\r\n\r\n", $response_next, 2);
+                            $statusLine_next = strtok($headers_next, "\r\n");
 
-                            curl_setopt($curl_origin, CURLOPT_HEADER, true);
-
-                            $response_origin = curl_exec($curl_origin);
-
-                            header("Access-Control-Allow-Origin: *");
-
-                            $err_origin = curl_error($curl_origin);
-
-                            curl_close($curl_origin);
-
-                            $dateTime = new DateTime('now', $timezone);
-
-                            $formattedTime = $dateTime->format('H:i:s');
-
-                            if ($err_origin){
-                                $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                fwrite($hook_file, "\n\n");
-                                fwrite($hook_file, $formattedTime . " - ERROR IN DELETED ORDER EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL.\n");
-                                fwrite($hook_file, "ERROR: " . $err_origin);
-                                fclose($hook_file);
-
-                            } else {
-                                if($response_origin){
-
-                                    $dateTime = new DateTime('now', $timezone);
-
-                                    $formattedTime = $dateTime->format('H:i:s');
-
-                                    $responseParts_origin = explode("\r\n\r\n", $response_origin, 2);
-                                    $httpResponseHeaders_origin = isset($responseParts_origin[0]) ? $responseParts_origin[0] : '';
-                                    $jsonResponseBody_origin = isset($responseParts_origin[1]) ? $responseParts_origin[1] : '';
-
-                                    $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                    fwrite($hook_file, "\n\n");
-                                    fwrite($hook_file, "DELETED ORDER EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL - " . strtok($httpResponseHeaders_origin, "\r\n") . "\n");
-                                    fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody_origin), JSON_PRETTY_PRINT));
-                                    fclose($hook_file);
-
-                                    $curl_del = curl_init();
-
-                                    $url_del = 'https://api.zamp.com/transactions/' . $origin_id;
-
-                                    curl_setopt_array($curl_del, [
-                                        CURLOPT_URL => $url_del,
-                                        CURLOPT_RETURNTRANSFER => true,
-                                        CURLOPT_ENCODING => "",
-                                        CURLOPT_MAXREDIRS => 10,
-                                        CURLOPT_TIMEOUT => 30,
-                                        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                                        CURLOPT_CUSTOMREQUEST => "DELETE",
-                                        CURLOPT_HTTPHEADER => [
-                                        "Accept: application/json",
-                                        "Content-Type: application/json",
-                                        "Authorization: Bearer " . $bear_token
-                                        ],
-                                    ]);
-
-                                    curl_setopt($curl_del, CURLOPT_HEADER, true);
-
-                                    $response_del = curl_exec($curl_del);
-
-                                    header("Access-Control-Allow-Origin: *");
-
-                                    $err_del = curl_error($curl_del);
-
-                                    curl_close($curl_del);
-
-                                    
-
-                                    if ($err_del){
-
-                                        $dateTime = new DateTime('now', $timezone);
-
-                                        $formattedTime = $dateTime->format('H:i:s');
-
-                                        $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                        fwrite($hook_file, "\n\n");
-                                        fwrite($hook_file, $formattedTime . " - ERROR DELETING ORDER FROM ZAMP.\n");
-                                        fwrite($hook_file, "ERROR: " . $err_del);
-                                        fclose($hook_file);
-
-                                    } else {
-                                        if($response_del){
-
-                                            $dateTime = new DateTime('now', $timezone);
-
-                                            $formattedTime = $dateTime->format('H:i:s');
-
-                                            $responseParts_del = explode("\r\n\r\n", $response_del, 2);
-                                            $httpResponseHeaders_del = isset($responseParts_del[0]) ? $responseParts_del[0] : '';
-                                            $jsonResponseBody_del = isset($responseParts_del[1]) ? $responseParts_del[1] : '';
-
-                                            $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                            fwrite($hook_file, "\n\n");
-                                            fwrite($hook_file, "ORDER DELETED RESPONSE FROM ZAMP - " . strtok($httpResponseHeaders_del, "\r\n") . "\n");
-                                            fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody_del), JSON_PRETTY_PRINT));
-                                            fclose($hook_file);
-                                        }
-
-                                        if($suffix !== "01"){
-                                            $suffend = (int) $suffix;
-
-                                            for($i = 1; $i < $suffend; $i++){
-                                                if($i < 10){
-                                                    $suffstring = "0" . (string) $i;
-                                                } else {
-                                                    $suffstring = (string) $i;
-                                                }
-
-                                                $next_id = "SW-" . $orderId . "-" . $suffstring;
-
-                                                $curl_next = curl_init();
-
-                                                $url_next = 'https://api.zamp.com/transactions/' . $next_id;
-
-                                                curl_setopt_array($curl_next, [
-                                                    CURLOPT_URL => $url_next,
-                                                    CURLOPT_RETURNTRANSFER => true,
-                                                    CURLOPT_ENCODING => "",
-                                                    CURLOPT_MAXREDIRS => 10,
-                                                    CURLOPT_TIMEOUT => 30,
-                                                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                                                    CURLOPT_CUSTOMREQUEST => "DELETE",
-                                                    CURLOPT_HTTPHEADER => [
-                                                    "Accept: application/json",
-                                                    "Content-Type: application/json",
-                                                    "Authorization: Bearer " . $bear_token
-                                                    ],
-                                                ]);
-
-                                                curl_setopt($curl_next, CURLOPT_HEADER, true);
-
-                                                $response_next = curl_exec($curl_next);
-
-                                                header("Access-Control-Allow-Origin: *");
-
-                                                $err_next = curl_error($curl_next);
-
-                                                curl_close($curl_next);
-
-                                                $dateTime = new DateTime('now', $timezone);
-
-                                                $formattedTime = $dateTime->format('H:i:s');
-
-                                                if ($err_next){
-                                                    $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                                    fwrite($hook_file, "\n\n");
-                                                    fwrite($hook_file, $formattedTime . " - ERROR IN DELETING PREVIOUS ORDER FROM ZAMP.\n");
-                                                    fwrite($hook_file, "ERROR: " . $err_next);
-                                                    fclose($hook_file);
-
-                                                } else {
-                                                    if($response_next){
-
-                                                        $dateTime = new DateTime('now', $timezone);
-
-                                                        $formattedTime = $dateTime->format('H:i:s');
-
-                                                        $responseParts_next = explode("\r\n\r\n", $response_next, 2);
-                                                        $httpResponseHeaders_next = isset($responseParts_next[0]) ? $responseParts_next[0] : '';
-                                                        $jsonResponseBody_next = isset($responseParts_next[1]) ? $responseParts_next[1] : '';
-
-                                                        $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                                        fwrite($hook_file, "\n\n");
-                                                        fwrite($hook_file, "DELETED PREVIOUS ORDER RESPONSE FROM ZAMP - " . strtok($httpResponseHeaders_next, "\r\n") . "\n");
-                                                        fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody_next), JSON_PRETTY_PRINT));
-                                                        fclose($hook_file);                         
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        $zamp_trans = [
-                                            'id' => $dataId
-                                        ];
-
-                                        $this->zampTransactionsRepository->delete([$zamp_trans], $context);
-                                    }
-                                }
-                            }
+                            $this->logger->info('Deleted previous transaction response from Zamp.', [
+                                'http_status' => $statusLine_next,
+                                'response' => json_decode($body_next, true),
+                                'transaction_id' => $next_id
+                            ]);
                         }
-                    }               
+                    }
                 }
+
+                // Delete local Zamp transaction record
+                $this->zampTransactionsRepository->delete([['id' => $dataId]], $context);
             }
         }
-    }  
+    }
+
+
     
      /**
      * Event handler for state transitions
@@ -653,11 +569,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                         
                 $formattedTime = $dateTime->format('H:i:s');
 
-                $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                fwrite($hook_file, "\n\n");
-                fwrite($hook_file, $formattedTime . " - PAID EVENT ORDER OBJECT RETRIEVED.\n");
-                fwrite($hook_file, "ORDER OBJECT: " . json_encode($order, JSON_PRETTY_PRINT));
-                fclose($hook_file);	
+                $formattedDate = $order->getCreatedAt()->format('Y-m-d H:i:s');
+                $this->logger->info("[$formattedTime] - PAID EVENT ORDER OBJECT RETRIEVED", [
+                    'order' => $order_number
+                ]);
 
                 $customer_group_id = $order->getOrderCustomer()->getCustomer()->getGroup()->id;
 
@@ -756,11 +671,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
                             
                     $formattedTime = $dateTime->format('H:i:s');
 
-                    $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                    fwrite($hook_file, "\n\n");
-                    fwrite($hook_file, $formattedTime . " - PAID EVENT REQUEST FOR ZAMP CALCULATION GENERATED.\n"); 
-                    fwrite($hook_file, "REQUEST: " . json_encode($zamp_json, JSON_PRETTY_PRINT));
-                    fclose($hook_file);	
+                    $this->logger->info("[$formattedTime] - PAID EVENT REQUEST FOR ZAMP CALCULATION GENERATED", [
+                        'request' => $zamp_json
+                    ]);	
         
                     $curl = curl_init();
                 
@@ -798,11 +711,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                     $formattedTime = $dateTime->format('H:i:s');
             
                     if ($err){
-                        $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                        fwrite($hook_file, "\n\n");
-                        fwrite($hook_file, $formattedTime . " - ERROR IN PAID EVENT REQUEST FOR ZAMP CALCULATION.\n");
-                        fwrite($hook_file, "ERROR: " . $err);
-                        fclose($hook_file);	
+                        $this->logger->error("[$formattedTime] - ERROR IN PAID EVENT REQUEST FOR ZAMP CALCULATION", [
+                            'error' => $err
+                        ]);
+                        return;	
                     } else {
                         if($response){
 
@@ -813,25 +725,25 @@ class ZampEventSubscriber implements EventSubscriberInterface
                             $responseParts = explode("\r\n\r\n", $response, 2);
                             $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
                             $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
-
-                            $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                            fwrite($hook_file, "\n\n");
-                            fwrite($hook_file, $formattedTime . " - PAID EVENT RESPONSE RECEIVED FROM ZAMP CALCULATION PRIOR TO CHANGE - " . strtok($httpResponseHeaders, "\r\n") . "\n");
-                            fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody), JSON_PRETTY_PRINT));
-                            fclose($hook_file);	
+                            
+                            $this->logger->info("PAID EVENT RESPONSE RECEIVED FROM ZAMP CALCULATION PRIOR TO CHANGE", [
+                                'http_status' => strtok($httpResponseHeaders, "\r\n"),
+                                'response' => json_decode($jsonResponseBody, true),
+                                'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                            ]);
 
                             $zamp_json->taxCollected = (float) number_format(json_decode($jsonResponseBody)->taxDue, 2);
                             $zamp_json->total = (float) number_format($zamp_json->subtotal + $zamp_json->shippingHandling + $zamp_json->taxCollected, 2);
 
                             $dateTime = new DateTime('now', $timezone);
 
-                            $formattedTime = $dateTime->format('H:i:s');
+                            $formattedTime = $dateTime->format('H:i:s');	
 
-                            $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                            fwrite($hook_file, "\n\n");
-                            fwrite($hook_file, $formattedTime . " - PAID EVENT REQUEST FROM ZAMP CALCULATION FOR ZAMP TRANSACTION GENERATED.\n");
-                            fwrite($hook_file, "REQUEST: " . json_encode($zamp_json, JSON_PRETTY_PRINT));
-                            fclose($hook_file);	
+                            $this->logger->info("PAID EVENT REQUEST FROM ZAMP CALCULATION FOR ZAMP TRANSACTION GENERATED", [
+                                'request' => json_decode(json_encode($zamp_json), true),
+                                'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                            ]);
+                            
                             
                             $curl2 = curl_init();
 
@@ -869,11 +781,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                                 $formattedTime = $dateTime->format('H:i:s');
 
-                                $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                fwrite($hook_file, "\n\n");
-                                fwrite($hook_file, $formattedTime . " - ERROR IN PAID EVENT RESPONSE FROM ZAMP TRANSACTION.\n");
-                                fwrite($hook_file, "ERROR: " . $err2);
-                                fclose($hook_file);
+                                $this->logger->error("[$formattedTime] - ERROR IN PAID EVENT RESPONSE FROM ZAMP TRANSACTION", [
+                                    'error' => $err
+                                ]);
+                                return;	
                             } else {
                                 if($response2){
                                     $zamp_resp = json_decode($response2);
@@ -886,11 +797,12 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                     $httpResponseHeaders2 = isset($responseParts2[0]) ? $responseParts2[0] : '';
                                     $jsonResponseBody2 = isset($responseParts2[1]) ? $responseParts2[1] : '';
 
-                                    $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                    fwrite($hook_file, "\n\n");
-                                    fwrite($hook_file, $formattedTime . " - PAID EVENT RESPONSE RECEIVED FROM ZAMP TRANSACTION - " . strtok($httpResponseHeaders2, "\r\n") . "\n");
-                                    fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody2), JSON_PRETTY_PRINT));
-                                    fclose($hook_file);
+                                    $this->logger->info("PAID EVENT RESPONSE RECEIVED FROM ZAMP TRANSACTION", [
+                                        'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s'),
+                                        'http_status' => strtok($httpResponseHeaders2, "\r\n"),
+                                        'response' => json_decode($jsonResponseBody2, true)
+                                    ]);
+                                    
 
                                     $zamp_trans = [
                                         'orderId' => $orderId,
@@ -909,10 +821,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
                 }                       
             } else if ($entityName == 'order_transaction' && $toPlace == 'Refunded') {
 
-                $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                fwrite($hook_file, "\n\n");
-                fwrite($hook_file, $formattedTime . " - REFUND EVENT ORDER TRIGGER.\n");
-                fclose($hook_file);
+                $this->logger->info("REFUND EVENT ORDER TRIGGER", [
+                    'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                ]);
+                
                 
                 $taxable = false;
 
@@ -1040,11 +952,11 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                 $formattedTime = $dateTime->format('H:i:s');
 
-                $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                fwrite($hook_file, "\n\n");
-                fwrite($hook_file, $formattedTime . " - REFUND EVENT ORDER OBJECT RETRIEVED.\n");
-                fwrite($hook_file, "ORDER OBJECT: " . json_encode($order, JSON_PRETTY_PRINT));
-                fclose($hook_file);
+                $this->logger->info("REFUND EVENT ORDER OBJECT RETRIEVED", [
+                    'order' => json_decode(json_encode($order), true),
+                    'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                ]);
+                
 
                 $order_number = $order->getOrderNumber();
 
@@ -1116,11 +1028,10 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                     $formattedTime = $dateTime->format('H:i:s');
 
-                    $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                    fwrite($hook_file, "\n\n");
-                    fwrite($hook_file, $formattedTime . " - ERROR IN REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL.\n");
-                    fwrite($hook_file, "ERROR: " . $err_origin);
-                    fclose($hook_file);
+                    $this->logger->error("[$formattedTime] - ERROR IN REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL", [
+                        'error' => $err
+                    ]);
+                    return;	
 
                 } else {
                     if($response_origin){
@@ -1133,11 +1044,11 @@ class ZampEventSubscriber implements EventSubscriberInterface
                         $httpResponseHeaders_origin = isset($responseParts_origin[0]) ? $responseParts_origin[0] : '';
                         $jsonResponseBody_origin = isset($responseParts_origin[1]) ? $responseParts_origin[1] : '';
 
-                        $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                        fwrite($hook_file, "\n\n");
-                        fwrite($hook_file, "REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL - " . strtok($httpResponseHeaders_origin, "\r\n") . "\n");
-                        fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody_origin), JSON_PRETTY_PRINT));
-                        fclose($hook_file);
+                        $this->logger->info("[$formattedTime] - REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL", [
+                            'http_status' => strtok($httpResponseHeaders_origin, "\r\n"),
+                            'response' => json_decode($jsonResponseBody_origin, true),
+                            'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                        ]);
 
                         $origin_transaction = json_decode($jsonResponseBody_origin);
                         $refund_items_arr = array();         
@@ -1182,11 +1093,9 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                         $formattedTime = $dateTime->format('H:i:s');
 
-                        $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                        fwrite($hook_file, "\n\n");
-                        fwrite($hook_file, $formattedTime . " - REFUND EVENT REQUEST GENERATED FOR ZAMP TRANSACTION.\n");
-                        fwrite($hook_file, "REQUEST: " . json_encode($refund_json, JSON_PRETTY_PRINT));
-                        fclose($hook_file);
+                        $this->logger->info("[$formattedTime] - REFUND EVENT REQUEST GENERATED FOR ZAMP TRANSACTION", [
+                            'request' => $refund_json
+                        ]);
 
                         $curl_whole_refund = curl_init();
 
@@ -1224,11 +1133,11 @@ class ZampEventSubscriber implements EventSubscriberInterface
                         $formattedTime = $dateTime->format('H:i:s');
             
                         if ($err_whole_refund){
-                            $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                            fwrite($hook_file, "\n\n");
-                            fwrite($hook_file, $formattedTime . " - ERROR IN REFUND EVENT RESPONSE FROM ZAMP TRANSACTION.\n");
-                            fwrite($hook_file, "ERROR: " . $err_whole_refund);
-                            fclose($hook_file);
+
+                            $this->logger->error("[$formattedTime] - ERROR IN REFUND EVENT RESPONSE FROM ZAMP TRANSACTION", [
+                                'error' => $err
+                            ]);
+                            return;
                         } else {
                             if($response_whole_refund){
 
@@ -1240,11 +1149,11 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                 $httpResponseHeaders_whole_refund = isset($responseParts_whole_refund[0]) ? $responseParts_whole_refund[0] : '';
                                 $jsonResponseBody_whole_refund = isset($responseParts_whole_refund[1]) ? $responseParts_whole_refund[1] : '';
 
-                                $hook_file = fopen("ZampTax-" . date('Y-m-d'). ".log", "a+");
-                                fwrite($hook_file, "\n\n");
-                                fwrite($hook_file, "REFUND EVENT RESPONSE FROM ZAMP TRANSACTION - " . strtok($httpResponseHeaders_whole_refund, "\r\n") . "\n");
-                                fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody_whole_refund), JSON_PRETTY_PRINT));
-                                fclose($hook_file);
+                                $this->logger->info("[$formattedTime] - REFUND EVENT RESPONSE FROM ZAMP TRANSACTION", [
+                                    'http_status' => strtok($httpResponseHeaders_whole_refund, "\r\n"),
+                                    'response' => json_decode($jsonResponseBody_whole_refund, true),
+                                    'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                                ]);
 
                                 $zamp_trans = [
                                     'id' => json_decode($transaction_info)->id,
@@ -1260,4 +1169,5 @@ class ZampEventSubscriber implements EventSubscriberInterface
             }    
         }         
     }
+
 }

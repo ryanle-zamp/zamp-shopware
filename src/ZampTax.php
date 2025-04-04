@@ -12,6 +12,7 @@ use Shopware\Core\Framework\Plugin\Context\InstallContext;
 use Shopware\Core\Framework\Plugin\Context\UninstallContext;
 use Shopware\Core\Framework\Plugin\Context\UpdateContext;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 
 /**
  * Zamp Tax integration plugin for Shopware 6
@@ -236,5 +237,10 @@ class ZampTax extends Plugin
      */
     public function postUpdate(UpdateContext $updateContext): void
     {
+    }
+
+	public function configureRoutes(RoutingConfigurator $routes, string $environment): void
+    {
+        $routes->import(__DIR__ . '/Core/Api', 'attribute');
     }
 }
