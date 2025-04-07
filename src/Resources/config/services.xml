@@ -1,4 +1,4 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 
 <container xmlns="http://symfony.com/schema/dic/services"
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -30,30 +30,65 @@
             <argument type="service" id="zamp_transactions.repository"/>
         </service>
 
-		<service id="ZampTax\Core\Api\ZampController" public="true">
+        <service id="ZampTax\Core\Api\ZampController" public="true">
             <call method="setContainer">
                 <argument type="service" id="service_container"/>
             </call>
-            <argument type="service" id="Doctrine\DBAL\Connection" />
-            <argument type="service" id="order.repository" />
-            <argument type="service" id="order_transaction.repository"/>            
-            <argument type="service" id="zamp_transactions.repository" />
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="order.repository"/>
+            <argument type="service" id="order_transaction.repository"/>
+            <argument type="service" id="zamp_transactions.repository"/>
+            <argument type="service" id="ZampTaxLogger"/>
         </service>
 
         <service id="ZampTax\Checkout\Cart\Tax\ZampTax">
-            <argument type="service" id="Doctrine\DBAL\Connection" />
-			<argument type="service" id="Shopware\Core\System\Snippet\SnippetService" />
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="Shopware\Core\System\Snippet\SnippetService"/>
+            <argument type="service" id="ZampTaxLogger"/>
             <tag name="shopware.tax.provider"/>
         </service>
 
-		<service id="ZampTax\Subscriber\ZampEventSubscriber">
-			<argument type="service" id="Doctrine\DBAL\Connection" />
-		 	<argument type="service" id="order.repository"/>
-            <argument type="service" id="order_transaction.repository"/>            
-			<argument type="service" id="zamp_transactions.repository" />
-            <argument type="service" id="tax_provider.repository" />
-            <tag name="kernel.event_subscriber" event="checkout.order.placed"/>
-			<tag name="kernel.event_subscriber" event="order.deleted"/>
+        <service id="ZampTax\Subscriber\ZampEventSubscriber">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="order.repository"/>
+            <argument type="service" id="order_transaction.repository"/>
+            <argument type="service" id="zamp_transactions.repository"/>
+            <argument type="service" id="tax_provider.repository"/>
+            <argument type="service" id="ZampTaxLogger"/>
+            <tag name="kernel.event_subscriber"/>
+        </service>
+
+        <service id="ZampTaxFileHandler" class="Monolog\Handler\StreamHandler" public="false">
+            <factory class="ZampTax\Factory\ZampTaxStreamFactory" method="createStreamHandler"/>
+            <argument>ZampTax</argument>
+            <argument>200</argument>
+            <argument>%core.basicInformation.timezone%</argument>
+        </service>
+
+
+        <service id="ZampTaxLogger" class="Monolog\Logger" public="true">
+            <argument>ZampTax</argument>
+            <call method="pushHandler">
+                <argument type="service" id="ZampTaxFileHandler"/>
+            </call>
+        </service>
+
+        <service id="ZampTax\Core\Api\LogController" public="true">
+            <argument type="service" id="parameter_bag"/>
+            <call method="setContainer">
+                <argument type="service" id="service_container"/>
+            </call>
+            <tag name="controller.service_arguments"/>
+        </service>
+
+        <service id="ZampTaxFileHandler" class="Monolog\Handler\StreamHandler" public="false">
+            <factory class="ZampTax\Factory\ZampTaxStreamFactory" method="createStreamHandler"/>
+            <argument>ZampTax</argument>
+            <argument>200</argument>
+        </service>
+
+        <service id="ZampTax\ScheduledTask\DeleteOldZampTaxLogsHandler" public="true">
+            <tag name="messenger.message_handler"/>
         </service>
 
     </services>
