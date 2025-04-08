@@ -32,6 +32,8 @@ class ZampController extends AbstractController
 	private $zampTransactionsRepository;
 
 	/** @var LoggerInterface Zamp Logging functionality */
+	
+	private $logger;
 
 	/**
      * Controller constructor
