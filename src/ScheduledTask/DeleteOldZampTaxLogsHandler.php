@@ -2,7 +2,7 @@
 
 namespace ZampTax\ScheduledTask;
 
-use Shopware\Core\Framework\MessageQueue\Handler\ScheduledTaskHandler;
+use Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTaskHandler;
 use Shopware\Core\Framework\Context;
 use Symfony\Component\Finder\Finder;
 use Psr\Log\LoggerInterface;
