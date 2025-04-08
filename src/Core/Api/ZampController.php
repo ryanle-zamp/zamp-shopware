@@ -408,11 +408,13 @@ class ZampController extends AbstractController
 						'response' => $zamp_resp
 					]);
 
-					$new_resp->status = match (true) {
-						$zamp_resp->code === "CONFLICT" && $zamp_resp->message === "Transaction already exists" => "exists",
-						$zamp_resp->id === $zamp_json->id => "completed",
-						default => "failed"
-					};
+					if($zamp_resp->code == "CONFLICT" && $zamp_resp->message == "Transaction already exists"){
+						$new_resp->status = "exists";
+					} else if ($zamp_resp->id == $zamp_json->id){
+						$new_resp->status = "completed";
+					} else {
+						$new_resp->status = "failed";
+					}	
 				}
 
 				return new JsonResponse($new_resp);

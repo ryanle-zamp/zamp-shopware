@@ -572,7 +572,8 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                 $formattedDate = $order->getCreatedAt()->format('Y-m-d H:i:s');
                 $this->logger->info("[$formattedTime] - PAID EVENT ORDER OBJECT RETRIEVED", [
-                    'order' => $order_number
+                    'order' => $order
+                    
                 ]);
 
                 $customer_group_id = $order->getOrderCustomer()->getCustomer()->getGroup()->id;
@@ -673,7 +674,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                     $formattedTime = $dateTime->format('H:i:s');
 
                     $this->logger->info("[$formattedTime] - PAID EVENT REQUEST FOR ZAMP CALCULATION GENERATED", [
-                        'request' => $zamp_json
+                        'request' => $zamp_obj
                     ]);	
         
                     $curl = curl_init();
@@ -730,7 +731,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                             $this->logger->info("PAID EVENT RESPONSE RECEIVED FROM ZAMP CALCULATION PRIOR TO CHANGE", [
                                 'http_status' => strtok($httpResponseHeaders, "\r\n"),
                                 'response' => json_decode($jsonResponseBody, true),
-                                'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                                'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
                             ]);
 
                             $zamp_json->taxCollected = (float) number_format(json_decode($jsonResponseBody)->taxDue, 2);
@@ -742,7 +743,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                             $this->logger->info("PAID EVENT REQUEST FROM ZAMP CALCULATION FOR ZAMP TRANSACTION GENERATED", [
                                 'request' => json_decode(json_encode($zamp_json), true),
-                                'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                                'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
                             ]);
                             
                             
@@ -783,7 +784,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                 $formattedTime = $dateTime->format('H:i:s');
 
                                 $this->logger->error("[$formattedTime] - ERROR IN PAID EVENT RESPONSE FROM ZAMP TRANSACTION", [
-                                    'error' => $err
+                                    'error' => $err2
                                 ]);
                                 return;	
                             } else {
@@ -799,7 +800,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                     $jsonResponseBody2 = isset($responseParts2[1]) ? $responseParts2[1] : '';
 
                                     $this->logger->info("PAID EVENT RESPONSE RECEIVED FROM ZAMP TRANSACTION", [
-                                        'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s'),
+                                        'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s'),
                                         'http_status' => strtok($httpResponseHeaders2, "\r\n"),
                                         'response' => json_decode($jsonResponseBody2, true)
                                     ]);
@@ -823,7 +824,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
             } else if ($entityName == 'order_transaction' && $toPlace == 'Refunded') {
 
                 $this->logger->info("REFUND EVENT ORDER TRIGGER", [
-                    'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                    'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
                 ]);
                 
                 
@@ -955,7 +956,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
 
                 $this->logger->info("REFUND EVENT ORDER OBJECT RETRIEVED", [
                     'order' => json_decode(json_encode($order), true),
-                    'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                    'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
                 ]);
                 
 
@@ -1030,7 +1031,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                     $formattedTime = $dateTime->format('H:i:s');
 
                     $this->logger->error("[$formattedTime] - ERROR IN REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL", [
-                        'error' => $err
+                        'error' => $err_origin
                     ]);
                     return;	
 
@@ -1048,7 +1049,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                         $this->logger->info("[$formattedTime] - REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL", [
                             'http_status' => strtok($httpResponseHeaders_origin, "\r\n"),
                             'response' => json_decode($jsonResponseBody_origin, true),
-                            'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                            'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
                         ]);
 
                         $origin_transaction = json_decode($jsonResponseBody_origin);
@@ -1136,7 +1137,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                         if ($err_whole_refund){
 
                             $this->logger->error("[$formattedTime] - ERROR IN REFUND EVENT RESPONSE FROM ZAMP TRANSACTION", [
-                                'error' => $err
+                                'error' => $err_whole_refund
                             ]);
                             return;
                         } else {
@@ -1153,7 +1154,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
                                 $this->logger->info("[$formattedTime] - REFUND EVENT RESPONSE FROM ZAMP TRANSACTION", [
                                     'http_status' => strtok($httpResponseHeaders_whole_refund, "\r\n"),
                                     'response' => json_decode($jsonResponseBody_whole_refund, true),
-                                    'timestamp' => (new \DateTime('now', new \DateTimeZone('UTC')))->format('H:i:s')
+                                    'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
                                 ]);
 
                                 $zamp_trans = [
