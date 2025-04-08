@@ -11,7 +11,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 #[Route(defaults: ['_routeScope' => ['api']])]
 class LogController extends AbstractController
 {
-    private string $projectDir;
+    private $projectDir;
 
     public function __construct(ParameterBagInterface $params)
     {

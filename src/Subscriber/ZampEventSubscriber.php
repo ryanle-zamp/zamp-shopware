@@ -35,7 +35,8 @@ class ZampEventSubscriber implements EventSubscriberInterface
     private $zampTransactionsRepository;
 	/** @var EntityRepository */
     private $taxProviderRepository;
-    private LoggerInterface $logger;
+    /** @var LoggerInterface */
+    private $logger;
 
     /**
      * Constructor
@@ -45,7 +46,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
      * @param EntityRepository $orderTransactionRepository Order transaction repository
      * @param EntityRepository $zampTransactionsRepository Zamp transactions repository
      * @param EntityRepository $taxProviderRepository Tax provider repository
-     * @param LoggerInterface $zampTaxLogger
+     * @param LoggerInterface $logger
      */
     public function __construct(
 		Connection $connection,
@@ -277,8 +278,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
             foreach ($event->getIds() as $orderId) {
                 $transaction_info = $this->get_trans_info($orderId);
                 $transInfo = json_decode($transaction_info);
-
-                if (!$transInfo->found || $transInfo->version !== $versionId) {
+				if (!$transInfo || empty($transInfo->found) || $transInfo->version !== $versionId) {
                     continue;
                 }
 
@@ -427,28 +427,132 @@ class ZampEventSubscriber implements EventSubscriberInterface
      */
     public function onStateTransition(StateMachineTransitionEvent $event): void
     {
-        if ($this->getTaxProviderActiveStatus()) {
+        if($this->getTaxProviderActiveStatus()){
+
             $timezone = new DateTimeZone('UTC');
+
             $entityName = $event->getEntityName();
             $toPlace = $event->getToPlace()->getName();   
+
             $dateTime = new DateTime('now', $timezone);
+
             $formattedTime = $dateTime->format('H:i:s');
 
-            if ($entityName === 'order_transaction' && $toPlace === 'Paid') {
-                $zamp_settings = $this->getZampSettings();
-                $taxable_states = explode(',', $zamp_settings['taxable_states']);
-                $bear_token = $zamp_settings['api_token'];
-                $trans_enabled = $zamp_settings['transactions_enabled'];
+            if($entityName == 'order_transaction' && $toPlace == 'Paid'){
+
+                $taxable = false;
+
+                $state_shortcodes = array(
+                    "Alabama" => "AL",
+                    "Alaska" => "AK",
+                    "Arizona" => "AZ",
+                    "Arkansas" => "AR",
+                    "California" => "CA",
+                    "Colorado" => "CO",
+                    "Connecticut" => "CT",
+                    "Delaware" => "DE",
+                    "District of Columbia" => "DC",
+                    "Florida" => "FL",
+                    "Georgia" => "GA",
+                    "Hawaii" => "HI",
+                    "Idaho" => "ID",
+                    "Illinois"=> "IL",
+                    "Indiana" => "IN",
+                    "Iowa" => "IA",
+                    "Kansas" => "KS",
+                    "Kentucky" => "KY",
+                    "Louisiana" => "LA",
+                    "Maine" => "ME",
+                    "Maryland" => "MD",
+                    "Massachusetts" => "MA",
+                    "Michigan" => "MI",
+                    "Minnesota" => "MN",
+                    "Mississippi" => "MS",
+                    "Missouri" => "MO",
+                    "Montana" => "MT",
+                    "Nebraska" => "NE",
+                    "Nevada" => "NV",
+                    "New Hampshire" => "NH",
+                    "New Jersey" => "NJ",
+                    "New Mexico" => "NM",
+                    "New York" => "NY",
+                    "North Carolina" => "NC",
+                    "North Dakota" => "ND",
+                    "Ohio" => "OH",
+                    "Oklahoma" => "OK",
+                    "Oregon" => "OR",
+                    "Pennsylvania" => "PA",
+                    "Puerto Rico" => "PR",
+                    "Rhode Island" => "RI",
+                    "South Carolina" => "SC",
+                    "South Dakota" => "SD",
+                    "Tennessee" => "TN",
+                    "Texas" => "TX",
+                    "Utah" => "UT",
+                    "Vermont" => "VT",
+                    "Virginia" => "VA",
+                    "Washington" => "WA",
+                    "West Virginia" => "WV",
+                    "Wisconsin" => "WI",
+                    "Wyoming" => "WY"
+                );
+
+                $ava_tax_exempt_codes = array(
+                    'A' => 'FEDERAL_GOV', 
+                    'B' => 'STATE_GOV', 
+                    'C' => 'TRIBAL', 
+                    'N' => 'LOCAL_GOV', 
+                    'E' => 'NON_PROFIT', 
+                    'F' => 'RELIGIOUS', 
+                    'G' => 'WHOLESALER', 
+                    'H' => 'AGRICULTURAL', 
+                    'I' => 'INDUSTRIAL_PROCESSING', 
+                    'J' => 'DIRECT_PAY', 
+                    'M' => 'EDUCATIONAL', 
+                    'D' => 'FEDERAL_GOV', 
+                    'K' => 'DIRECT_PAY', 
+                    'L' => 'LESSOR'
+                );
+        
+                $zamp_tax_codes = array(
+                    'FEDERAL_GOV' => 'FEDERAL_GOV', 
+                    'STATE_GOV' => 'STATE_GOV', 
+                    'TRIBAL' => 'TRIBAL', 
+                    'LOCAL_GOV' => 'LOCAL_GOV', 
+                    'NON_PROFIT' => 'NON_PROFIT', 
+                    'RELIGIOUS' => 'RELIGIOUS', 
+                    'WHOLESALER' => 'WHOLESALER', 
+                    'AGRICULTURAL' => 'AGRICULTURAL', 
+                    'INDUSTRIAL_PROCESSING' => 'INDUSTRIAL_PROCESSING', 
+                    'DIRECT_PAY' => 'DIRECT_PAY', 
+                    'EDUCATIONAL' => 'EDUCATIONAL', 
+                    'LESSOR' => 'LESSOR',
+                    'SNAP' => 'SNAP',
+                    'MEDICAL' => 'MEDICAL',
+                    'DATA_CENTER' => 'DATA_CENTER',
+                    'EDU_PRIVATE' => 'EDU_PRIVATE',
+                    'EDU_PUBLIC' => 'EDU_PUBLIC'
+                );
+        
                 $zamp_exempt_code = "";
+
                 $context = $event->getContext();
                 $versionId = $context->getVersionId();
                 $orderTransId = $event->getEntityId();
 
+                $zamp_settings = $this->getZampSettings();
+
+                $taxable_states = explode(',', $zamp_settings['taxable_states']);
+                $bear_token = $zamp_settings['api_token'];
+                $trans_enabled = $zamp_settings['transactions_enabled'];
+                
                 $ot_criteria = new Criteria([$orderTransId]);
                 $transaction_order = $this->orderTransactionRepository->search($ot_criteria, $context)->first();
+
                 $orderId = $transaction_order->getOrderId();
 
                 $criteria = new Criteria([$orderId]);
+
                 $criteria->addAssociation('lineItems');
                 $criteria->addAssociation('deliveries');
                 $criteria->addAssociation('deliveries.shippingOrderAddress');
@@ -456,184 +560,385 @@ class ZampEventSubscriber implements EventSubscriberInterface
                 $criteria->addAssociation('orderCustomer');
                 $criteria->addAssociation('orderCustomer.customer');
                 $criteria->addAssociation('orderCustomer.customer.group');
+
                 $order = $this->orderRepository->search($criteria, $context)->first();
 
                 $order_number = $order->getOrderNumber();
-                $customer_group_custom_fields = $order->getOrderCustomer()->getCustomer()->getGroup()->getCustomFields();
 
-                if (!empty($customer_group_custom_fields['tax_exempt_code'])) {
-                    $zamp_exempt_code = $customer_group_custom_fields['tax_exempt_code'];
-                    if (strlen(trim($zamp_exempt_code)) === 1) {
-                        $ava_tax_exempt_codes = [...]; // use the same array here as before
-                        $zamp_exempt_code = $ava_tax_exempt_codes[trim($zamp_exempt_code)] ?? '';
-                    }
-                }
-
-                $delivery = $order->getDeliveries()->first();
-                $shippingAddress = $delivery ? $delivery->getShippingOrderAddress() : null;
-                $state_shortcodes = [...]; // use the same array here as before
-                $state = $shippingAddress ? $state_shortcodes[$shippingAddress->getCountryState()->getName()] ?? '' : '';
+                $dateTime = new DateTime('now', $timezone);
+                        
+                $formattedTime = $dateTime->format('H:i:s');
 
                 $formattedDate = $order->getCreatedAt()->format('Y-m-d H:i:s');
                 $this->logger->info("[$formattedTime] - PAID EVENT ORDER OBJECT RETRIEVED", [
-                    'order' => $order_number
+                    'order' => $order
+                    
                 ]);
 
-                if ($trans_enabled && in_array($state, $taxable_states)) {
-                    $zamp_items_arr = [];
+                $customer_group_id = $order->getOrderCustomer()->getCustomer()->getGroup()->id;
+
+                $customer_group_custom_fields = $order->getOrderCustomer()->getCustomer()->getGroup()->getCustomFields();
+
+                if(count($customer_group_custom_fields) && isSet($customer_group_custom_fields['tax_exempt_code'])){
+                    $zamp_exempt_code = $customer_group_custom_fields['tax_exempt_code'];
+                }
+
+                if(isset($zamp_exempt_code) && trim($zamp_exempt_code) != ""){
+                    if(strlen(trim($zamp_exempt_code)) == 1){
+                        $zamp_exempt_code = $ava_tax_exempt_codes[trim($zamp_exempt_code)];
+                    } else {
+                        $zamp_exempt_code = trim($zamp_exempt_code);
+                    }
+                }
+
+
+                $street = '';
+                $city = '';
+                $state = '';
+                $zip = '';
+
+                if($order){
+                    $delivery = $order->getDeliveries()->first();
+
+                    if ($delivery) {
+                        $shippingAddress = $delivery->getShippingOrderAddress();
+                        if ($shippingAddress) {
+                            $street = $shippingAddress->getStreet();
+                            $city = $shippingAddress->getCity();
+                            $zip = $shippingAddress->getZipcode();
+                            $state = $state_shortcodes[$shippingAddress->getCountryState()->name];
+                        }
+                    }	
+
+                }
+
+                $formattedDate = $order->createdAt->format('Y-m-d H:i:s');
+
+
+
+                if($trans_enabled && in_array($state, $taxable_states)){
+                    $zamp_items_arr = array();
                     $suffix = "01";
+
                     $subtotal = 0;
-
-                    $zamp_json = new \stdClass();
-                    $zamp_json->id = "SW-{$orderId}-{$suffix}";
-                    $zamp_json->name = "SW-{$order_number}-{$suffix}";
+                    $zamp_json = new stdClass();
+                    $zamp_json->id = "SW-" . $orderId . "-" . $suffix;
+                    $zamp_json->name = 'SW-' . $order_number . "-" . $suffix;
                     $zamp_json->transactedAt = $formattedDate;
-                    $zamp_json->entity = $zamp_exempt_code ?: null;
-                    $zamp_json->purpose = $zamp_exempt_code === "WHOLESALER" ? "RESALE" : null;
-                    $zamp_json->discount = 0;
+                    $zamp_json->entity = $zamp_exempt_code != "" ? $zamp_exempt_code : null;
+                    $zamp_json->purpose = $zamp_exempt_code == "WHOLESALER" ? "RESALE" : null;
+                    $zamp_json->discount = 0;				
 
-                    foreach ($order->getLineItems() as $item) {
-                        if ($item->getType() === 'promotion') {
+                    foreach($order->lineItems as $item){
+                        if($item->getType() == 'promotion'){
                             $zamp_json->discount += $item->getPrice()->getTotalPrice() * -1;
                         } else {
-                            $item_obj = new \stdClass();
-                            $item_obj->quantity = $item->getQuantity();
-                            $item_obj->id = $item->getId();
-                            $item_obj->amount = round($item->getUnitPrice(), 2);
-                            $item_obj->productName = $item->getLabel();
-                            $item_obj->productSku = $item->getPayload()['productNumber'];
-                            $ptc_data = $this->getZampProductTaxCode($item_obj->id);
-                            $ptc = $ptc_data ? $ptc_data['product_tax_code'] : '';
-                            $item_obj->productTaxCode = (substr($ptc, 0, 5) === 'R_TPP' || substr($ptc, 0, 5) === 'R_SRV' || substr($ptc, 0, 5) === 'R_DIG') ? $ptc : 'R_TPP';
-                            $subtotal += $item->getTotalPrice();
-                            $zamp_items_arr[] = $item_obj;
-                        }
+                            $item_obj = new stdClass();
+
+                            $unit_price = $item->unitPrice;
+                            $total_price = $item->totalPrice;
+
+                            $subtotal += (float) number_format($total_price, 2);
+                            $item_obj->quantity = $item->quantity;
+                            $item_obj->id = $item->id;
+
+                            $item_obj->amount = (float) number_format($unit_price, 2);
+                            $item_obj->productName = $item->label;
+                            $item_obj->productSku = $item->payload['productNumber'];
+                            $ptc = $this->getZampProductTaxCode($item_obj->id) ? $this->getZampProductTaxCode($item_obj->id)['product_tax_code'] : '';
+                            $item_obj->productTaxCode = $ptc !== '' && (substr($ptc, 0, 5) == "R_TPP" || substr($ptc, 0, 5) == "R_SRV" || substr($ptc, 0, 5) == "R_DIG") ? $ptc : "R_TPP";
+                            array_push($zamp_items_arr, $item_obj);
+                        }					
                     }
 
-                    $zamp_json->subtotal = round($subtotal - $zamp_json->discount, 2);
-                    $zamp_json->shippingHandling = round($order->getShippingCosts()->getTotalPrice(), 2);
+                    $zamp_json->subtotal = $subtotal - $zamp_json->discount;
+                    $zamp_json->shippingHandling = $order->shippingCosts->getTotalPrice();
                     $zamp_json->total = $zamp_json->subtotal + $zamp_json->shippingHandling;
 
-                    $shipToAddress = new \stdClass();
-                    $shipToAddress->line1 = $shippingAddress ? $shippingAddress->getStreet() : '';
+                    $shipToAddress = new stdClass();
+                    $shipToAddress->line1 = $street;
                     $shipToAddress->line2 = 'empty';
-                    $shipToAddress->city = $shippingAddress ? $shippingAddress->getCity() : '';
+                    $shipToAddress->city = $city;
                     $shipToAddress->state = $state;
-                    $shipToAddress->zip = $shippingAddress ? $shippingAddress->getZipcode() : '';
                     $shipToAddress->country = 'US';
+                    $shipToAddress->zip = $zip;
 
                     $zamp_json->shipToAddress = $shipToAddress;
                     $zamp_json->lineItems = $zamp_items_arr;
 
-                    $this->logger->info("[$formattedTime] - PAID EVENT REQUEST FOR ZAMP CALCULATION GENERATED", [
-                        'request' => $zamp_json
-                    ]);
+                    $zamp_obj = json_encode($zamp_json);
 
+                    $dateTime = new DateTime('now', $timezone);
+                            
+                    $formattedTime = $dateTime->format('H:i:s');
+
+                    $this->logger->info("[$formattedTime] - PAID EVENT REQUEST FOR ZAMP CALCULATION GENERATED", [
+                        'request' => $zamp_obj
+                    ]);	
+        
                     $curl = curl_init();
+                
+                    $url = "https://api.zamp.com/calculations";
+        
                     curl_setopt_array($curl, [
-                        CURLOPT_URL => 'https://api.zamp.com/calculations',
+                        CURLOPT_URL => $url,
                         CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_ENCODING => '',
+                        CURLOPT_ENCODING => "",
                         CURLOPT_MAXREDIRS => 10,
                         CURLOPT_TIMEOUT => 30,
                         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                        CURLOPT_CUSTOMREQUEST => 'POST',
-                        CURLOPT_POSTFIELDS => json_encode($zamp_json),
+                        CURLOPT_CUSTOMREQUEST => "POST",
+                        CURLOPT_POSTFIELDS => $zamp_obj,
                         CURLOPT_HTTPHEADER => [
-                            'Accept: application/json',
-                            'Content-Type: application/json',
-                            'Authorization: Bearer ' . $bear_token
+                        "Accept: application/json",
+                        "Content-Type: application/json",
+                        "Authorization: Bearer " . $bear_token
                         ],
-                        CURLOPT_HEADER => true
                     ]);
-
+        
+                    curl_setopt($curl, CURLOPT_HEADER, true);
+                    
                     $response = curl_exec($curl);
+            
+                    header("Access-Control-Allow-Origin: *");
+
+            
                     $err = curl_error($curl);
+            
                     curl_close($curl);
 
-                    if ($err) {
+                    $dateTime = new DateTime('now', $timezone);
+
+                    $formattedTime = $dateTime->format('H:i:s');
+            
+                    if ($err){
                         $this->logger->error("[$formattedTime] - ERROR IN PAID EVENT REQUEST FOR ZAMP CALCULATION", [
                             'error' => $err
                         ]);
-                        return;
+                        return;	
+                    } else {
+                        if($response){
+
+                            $dateTime = new DateTime('now', $timezone);
+
+                            $formattedTime = $dateTime->format('H:i:s');
+
+                            $responseParts = explode("\r\n\r\n", $response, 2);
+                            $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
+                            $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
+                            
+                            $this->logger->info("PAID EVENT RESPONSE RECEIVED FROM ZAMP CALCULATION PRIOR TO CHANGE", [
+                                'http_status' => strtok($httpResponseHeaders, "\r\n"),
+                                'response' => json_decode($jsonResponseBody, true),
+                                'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
+                            ]);
+
+                            $zamp_json->taxCollected = (float) number_format(json_decode($jsonResponseBody)->taxDue, 2);
+                            $zamp_json->total = (float) number_format($zamp_json->subtotal + $zamp_json->shippingHandling + $zamp_json->taxCollected, 2);
+
+                            $dateTime = new DateTime('now', $timezone);
+
+                            $formattedTime = $dateTime->format('H:i:s');	
+
+                            $this->logger->info("PAID EVENT REQUEST FROM ZAMP CALCULATION FOR ZAMP TRANSACTION GENERATED", [
+                                'request' => json_decode(json_encode($zamp_json), true),
+                                'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
+                            ]);
+                            
+                            
+                            $curl2 = curl_init();
+
+                            $url2 = "https://api.zamp.com/transactions";
+
+                            curl_setopt_array($curl2, [
+                                CURLOPT_URL => $url2,
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_ENCODING => "",
+                                CURLOPT_MAXREDIRS => 10,
+                                CURLOPT_TIMEOUT => 30,
+                                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                                CURLOPT_CUSTOMREQUEST => "POST",
+                                CURLOPT_POSTFIELDS => json_encode($zamp_json),
+                                CURLOPT_HTTPHEADER => [
+                                "Accept: application/json",
+                                "Content-Type: application/json",
+                                "Authorization: Bearer " . $bear_token
+                                ],
+                            ]);
+
+                            curl_setopt($curl2, CURLOPT_HEADER, true);
+
+                            $response2 = curl_exec($curl2);
+
+                            header("Access-Control-Allow-Origin: *");
+
+                            $err2 = curl_error($curl2);
+
+                            curl_close($curl2);
+
+                            if ($err2){
+
+                                $dateTime = new DateTime('now', $timezone);
+
+                                $formattedTime = $dateTime->format('H:i:s');
+
+                                $this->logger->error("[$formattedTime] - ERROR IN PAID EVENT RESPONSE FROM ZAMP TRANSACTION", [
+                                    'error' => $err2
+                                ]);
+                                return;	
+                            } else {
+                                if($response2){
+                                    $zamp_resp = json_decode($response2);
+
+                                    $dateTime = new DateTime('now', $timezone);
+
+                                    $formattedTime = $dateTime->format('H:i:s');
+
+                                    $responseParts2 = explode("\r\n\r\n", $response2, 2);
+                                    $httpResponseHeaders2 = isset($responseParts2[0]) ? $responseParts2[0] : '';
+                                    $jsonResponseBody2 = isset($responseParts2[1]) ? $responseParts2[1] : '';
+
+                                    $this->logger->info("PAID EVENT RESPONSE RECEIVED FROM ZAMP TRANSACTION", [
+                                        'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s'),
+                                        'http_status' => strtok($httpResponseHeaders2, "\r\n"),
+                                        'response' => json_decode($jsonResponseBody2, true)
+                                    ]);
+                                    
+
+                                    $zamp_trans = [
+                                        'orderId' => $orderId,
+                                        'firstVersionId' => $versionId,
+                                        'orderNumber' => $order_number,
+                                        'currentIdSuffix' => $suffix,
+                                        'status' => 'commited'
+                                    ];
+
+                                    $this->zampTransactionsRepository->upsert([$zamp_trans], $event->getContext());
+
+                                }
+                            }
+                        }
                     }
+                }                       
+            } else if ($entityName == 'order_transaction' && $toPlace == 'Refunded') {
 
-                    [$headers, $body] = explode("\r\n\r\n", $response, 2);
-                    $this->logger->info("[$formattedTime] - PAID EVENT RESPONSE RECEIVED FROM ZAMP CALCULATION", [
-                        'http_status' => strtok($headers, "\r\n"),
-                        'response' => json_decode($body, true)
-                    ]);
+                $this->logger->info("REFUND EVENT ORDER TRIGGER", [
+                    'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
+                ]);
+                
+                
+                $taxable = false;
 
-                    $zamp_json->taxCollected = round(json_decode($body)->taxDue ?? 0, 2);
-                    $zamp_json->total = round($zamp_json->subtotal + $zamp_json->shippingHandling + $zamp_json->taxCollected, 2);
+                $state_shortcodes = array(
+                    "Alabama" => "AL",
+                    "Alaska" => "AK",
+                    "Arizona" => "AZ",
+                    "Arkansas" => "AR",
+                    "California" => "CA",
+                    "Colorado" => "CO",
+                    "Connecticut" => "CT",
+                    "Delaware" => "DE",
+                    "District of Columbia" => "DC",
+                    "Florida" => "FL",
+                    "Georgia" => "GA",
+                    "Hawaii" => "HI",
+                    "Idaho" => "ID",
+                    "Illinois"=> "IL",
+                    "Indiana" => "IN",
+                    "Iowa" => "IA",
+                    "Kansas" => "KS",
+                    "Kentucky" => "KY",
+                    "Louisiana" => "LA",
+                    "Maine" => "ME",
+                    "Maryland" => "MD",
+                    "Massachusetts" => "MA",
+                    "Michigan" => "MI",
+                    "Minnesota" => "MN",
+                    "Mississippi" => "MS",
+                    "Missouri" => "MO",
+                    "Montana" => "MT",
+                    "Nebraska" => "NE",
+                    "Nevada" => "NV",
+                    "New Hampshire" => "NH",
+                    "New Jersey" => "NJ",
+                    "New Mexico" => "NM",
+                    "New York" => "NY",
+                    "North Carolina" => "NC",
+                    "North Dakota" => "ND",
+                    "Ohio" => "OH",
+                    "Oklahoma" => "OK",
+                    "Oregon" => "OR",
+                    "Pennsylvania" => "PA",
+                    "Puerto Rico" => "PR",
+                    "Rhode Island" => "RI",
+                    "South Carolina" => "SC",
+                    "South Dakota" => "SD",
+                    "Tennessee" => "TN",
+                    "Texas" => "TX",
+                    "Utah" => "UT",
+                    "Vermont" => "VT",
+                    "Virginia" => "VA",
+                    "Washington" => "WA",
+                    "West Virginia" => "WV",
+                    "Wisconsin" => "WI",
+                    "Wyoming" => "WY"
+                );
 
-                    $this->logger->info("[$formattedTime] - PAID EVENT REQUEST FROM ZAMP CALCULATION FOR ZAMP TRANSACTION GENERATED", [
-                        'request' => $zamp_json
-                    ]);
+                $ava_tax_exempt_codes = array(
+                    'A' => 'FEDERAL_GOV', 
+                    'B' => 'STATE_GOV', 
+                    'C' => 'TRIBAL', 
+                    'N' => 'LOCAL_GOV', 
+                    'E' => 'NON_PROFIT', 
+                    'F' => 'RELIGIOUS', 
+                    'G' => 'WHOLESALER', 
+                    'H' => 'AGRICULTURAL', 
+                    'I' => 'INDUSTRIAL_PROCESSING', 
+                    'J' => 'DIRECT_PAY', 
+                    'M' => 'EDUCATIONAL', 
+                    'D' => 'FEDERAL_GOV', 
+                    'K' => 'DIRECT_PAY', 
+                    'L' => 'LESSOR'
+                );
+        
+                $zamp_tax_codes = array(
+                    'FEDERAL_GOV' => 'FEDERAL_GOV', 
+                    'STATE_GOV' => 'STATE_GOV', 
+                    'TRIBAL' => 'TRIBAL', 
+                    'LOCAL_GOV' => 'LOCAL_GOV', 
+                    'NON_PROFIT' => 'NON_PROFIT', 
+                    'RELIGIOUS' => 'RELIGIOUS', 
+                    'WHOLESALER' => 'WHOLESALER', 
+                    'AGRICULTURAL' => 'AGRICULTURAL', 
+                    'INDUSTRIAL_PROCESSING' => 'INDUSTRIAL_PROCESSING', 
+                    'DIRECT_PAY' => 'DIRECT_PAY', 
+                    'EDUCATIONAL' => 'EDUCATIONAL', 
+                    'LESSOR' => 'LESSOR',
+                    'SNAP' => 'SNAP',
+                    'MEDICAL' => 'MEDICAL',
+                    'DATA_CENTER' => 'DATA_CENTER',
+                    'EDU_PRIVATE' => 'EDU_PRIVATE',
+                    'EDU_PUBLIC' => 'EDU_PUBLIC'
+                );
+        
+                $zamp_exempt_code = "";			
 
-                    $curl2 = curl_init();
-                    curl_setopt_array($curl2, [
-                        CURLOPT_URL => 'https://api.zamp.com/transactions',
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_ENCODING => '',
-                        CURLOPT_MAXREDIRS => 10,
-                        CURLOPT_TIMEOUT => 30,
-                        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                        CURLOPT_CUSTOMREQUEST => 'POST',
-                        CURLOPT_POSTFIELDS => json_encode($zamp_json),
-                        CURLOPT_HTTPHEADER => [
-                            'Accept: application/json',
-                            'Content-Type: application/json',
-                            'Authorization: Bearer ' . $bear_token
-                        ],
-                        CURLOPT_HEADER => true
-                    ]);
-
-                    $response2 = curl_exec($curl2);
-                    $err2 = curl_error($curl2);
-                    curl_close($curl2);
-
-                    if ($err2) {
-                        $this->logger->error("[$formattedTime] - ERROR IN PAID EVENT RESPONSE FROM ZAMP TRANSACTION", [
-                            'error' => $err2
-                        ]);
-                        return;
-                    }
-
-                    [$headers2, $body2] = explode("\r\n\r\n", $response2, 2);
-                    $this->logger->info("[$formattedTime] - PAID EVENT RESPONSE RECEIVED FROM ZAMP TRANSACTION", [
-                        'http_status' => strtok($headers2, "\r\n"),
-                        'response' => json_decode($body2, true)
-                    ]);
-
-                    $zamp_trans = [
-                        'orderId' => $orderId,
-                        'firstVersionId' => $versionId,
-                        'orderNumber' => $order_number,
-                        'currentIdSuffix' => $suffix,
-                        'status' => 'commited'
-                    ];
-
-                    $this->zampTransactionsRepository->upsert([$zamp_trans], $context);
-                }
-            }
-
-            if ($entityName === 'order_transaction' && $toPlace === 'Refunded') {
-                $this->logger->info("[$formattedTime] - REFUND EVENT ORDER TRIGGER");
-
-                $zamp_settings = $this->getZampSettings();
-                $taxable_states = explode(',', $zamp_settings['taxable_states']);
-                $bear_token = $zamp_settings['api_token'];
-                $trans_enabled = $zamp_settings['transactions_enabled'];
-                $zamp_exempt_code = "";
                 $context = $event->getContext();
                 $orderTransId = $event->getEntityId();
 
+                $zamp_settings = $this->getZampSettings();
+
+                $taxable_states = explode(',', $zamp_settings['taxable_states']);
+                $bear_token = $zamp_settings['api_token'];
+                $trans_enabled = $zamp_settings['transactions_enabled'];
+                
                 $ot_criteria = new Criteria([$orderTransId]);
                 $transaction_order = $this->orderTransactionRepository->search($ot_criteria, $context)->first();
+
                 $orderId = $transaction_order->getOrderId();
 
                 $criteria = new Criteria([$orderId]);
+
                 $criteria->addAssociation('lineItems');
                 $criteria->addAssociation('deliveries');
                 $criteria->addAssociation('deliveries.shippingOrderAddress');
@@ -641,156 +946,229 @@ class ZampEventSubscriber implements EventSubscriberInterface
                 $criteria->addAssociation('orderCustomer');
                 $criteria->addAssociation('orderCustomer.customer');
                 $criteria->addAssociation('orderCustomer.customer.group');
+
                 $order = $this->orderRepository->search($criteria, $context)->first();
 
                 $dateTime = new DateTime('now', $timezone);
+
                 $formattedTime = $dateTime->format('H:i:s');
 
-                $this->logger->info("[$formattedTime] - REFUND EVENT ORDER OBJECT RETRIEVED", [
-                    'order' => $order->getOrderNumber()
+                $this->logger->info("REFUND EVENT ORDER OBJECT RETRIEVED", [
+                    'order' => json_decode(json_encode($order), true),
+                    'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
                 ]);
+                
+
+                $order_number = $order->getOrderNumber();
+
+                $customer_group_id = $order->getOrderCustomer()->getCustomer()->getGroup()->id;
 
                 $customer_group_custom_fields = $order->getOrderCustomer()->getCustomer()->getGroup()->getCustomFields();
-                if (!empty($customer_group_custom_fields['tax_exempt_code'])) {
+
+                if(count($customer_group_custom_fields) && isSet($customer_group_custom_fields['tax_exempt_code'])){
                     $zamp_exempt_code = $customer_group_custom_fields['tax_exempt_code'];
-                    if (strlen(trim($zamp_exempt_code)) === 1) {
-                        $ava_tax_exempt_codes = [...]; // insert full map here again
-                        $zamp_exempt_code = $ava_tax_exempt_codes[trim($zamp_exempt_code)] ?? '';
+                }
+
+                if(isset($zamp_exempt_code) && trim($zamp_exempt_code) != ""){
+                    if(strlen(trim($zamp_exempt_code)) == 1){
+                        $zamp_exempt_code = $ava_tax_exempt_codes[trim($zamp_exempt_code)];
+                    } else {
+                        $zamp_exempt_code = trim($zamp_exempt_code);
                     }
                 }
 
-                $suffix = '01';
-                $transaction_info = $this->get_trans_info($orderId);
-                $decoded_info = json_decode($transaction_info);
+                $suffix = "01";
+                $new_suffix = "01";
 
-                if ($decoded_info->found ?? false) {
-                    $suffix = $decoded_info->suffix;
+                $transaction_info = $this->get_current_suffix($orderId);
+
+                if(json_decode($transaction_info)->found){
+                    $suffix = json_decode($transaction_info)->suffix;
                 }
 
                 $origin_id = "SW-" . $orderId . "-" . $suffix;
-                $url_origin = 'https://api.zamp.com/transactions/' . $origin_id;
+
+                $origin_transaction = new stdClass();
+
+                $zamp_resp = new stdClass();
 
                 $curl_origin = curl_init();
+
+                $url_origin = 'https://api.zamp.com/transactions/' . $origin_id;
+
                 curl_setopt_array($curl_origin, [
                     CURLOPT_URL => $url_origin,
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_ENCODING => '',
+                    CURLOPT_ENCODING => "",
                     CURLOPT_MAXREDIRS => 10,
                     CURLOPT_TIMEOUT => 30,
                     CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                    CURLOPT_CUSTOMREQUEST => 'GET',
+                    CURLOPT_CUSTOMREQUEST => "GET",
                     CURLOPT_HTTPHEADER => [
-                        'Accept: application/json',
-                        'Content-Type: application/json',
-                        'Authorization: Bearer ' . $bear_token
+                    "Accept: application/json",
+                    "Content-Type: application/json",
+                    "Authorization: Bearer " . $bear_token
                     ],
-                    CURLOPT_HEADER => true
                 ]);
 
+                curl_setopt($curl_origin, CURLOPT_HEADER, true);
+
                 $response_origin = curl_exec($curl_origin);
+
+                header("Access-Control-Allow-Origin: *");
+
                 $err_origin = curl_error($curl_origin);
+
                 curl_close($curl_origin);
 
-                $dateTime = new DateTime('now', $timezone);
-                $formattedTime = $dateTime->format('H:i:s');
+            
 
-                if ($err_origin) {
+                if ($err_origin){
+
+                    $dateTime = new DateTime('now', $timezone);
+
+                    $formattedTime = $dateTime->format('H:i:s');
+
                     $this->logger->error("[$formattedTime] - ERROR IN REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL", [
                         'error' => $err_origin
                     ]);
-                    return;
+                    return;	
+
+                } else {
+                    if($response_origin){
+
+                        $dateTime = new DateTime('now', $timezone);
+
+                        $formattedTime = $dateTime->format('H:i:s');
+
+                        $responseParts_origin = explode("\r\n\r\n", $response_origin, 2);
+                        $httpResponseHeaders_origin = isset($responseParts_origin[0]) ? $responseParts_origin[0] : '';
+                        $jsonResponseBody_origin = isset($responseParts_origin[1]) ? $responseParts_origin[1] : '';
+
+                        $this->logger->info("[$formattedTime] - REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL", [
+                            'http_status' => strtok($httpResponseHeaders_origin, "\r\n"),
+                            'response' => json_decode($jsonResponseBody_origin, true),
+                            'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
+                        ]);
+
+                        $origin_transaction = json_decode($jsonResponseBody_origin);
+                        $refund_items_arr = array();         
+                        $refund_json = new stdClass();
+
+                        $refund_json->id = "REF-" . $origin_transaction->id;
+                        $refund_json->name = "REF-" . $origin_transaction->name;
+                        $refund_json->parentId = $origin_transaction->id;
+                        $refund_json->transactedAt = date('Y-m-d H:i:s');
+                        $refund_json->entity = $origin_transaction->entity;
+                        $refund_json->purpose = $origin_transaction->purpose;
+                        $refund_json->discount = $origin_transaction->discount;
+
+                        foreach($origin_transaction->lineItems as $lineItem){
+                            
+                            $item_obj = new stdClass();        
+
+                            $item_obj->quantity = $lineItem->quantity * -1;
+                            $item_obj->id = $lineItem->id;
+                            $item_obj->amount = (float) number_format($lineItem->amount, 2);
+                            $item_obj->productName = $lineItem->productName;
+                            $item_obj->productSku = $lineItem->productSku;
+                            $item_obj->productTaxCode = $lineItem->productTaxCode;
+                            array_push($refund_items_arr, $item_obj);   
+                        }
+                                                                        
+                        $refund_json->subtotal = (float) number_format($origin_transaction->subtotal * -1, 2);
+                        $refund_json->shippingHandling = (float) number_format($origin_transaction->shippingHandling * -1, 2);
+                        $refund_json->total = (float) number_format($origin_transaction->total * -1, 2);
+                        $refund_json->taxCollected = (float) number_format($origin_transaction->taxCollected * -1, 2);
+
+                        $refund_json->shipToAddress = new stdClass();
+                        $refund_json->shipToAddress->line1 = $origin_transaction->shipToAddress->line1;
+                        $refund_json->shipToAddress->line2 = $origin_transaction->shipToAddress->line2;
+                        $refund_json->shipToAddress->city = $origin_transaction->shipToAddress->city;
+                        $refund_json->shipToAddress->state = $origin_transaction->shipToAddress->state;
+                        $refund_json->shipToAddress->zip = $origin_transaction->shipToAddress->zip;
+                        $refund_json->shipToAddress->country = $origin_transaction->shipToAddress->country;
+                        $refund_json->lineItems = $refund_items_arr;
+
+                        $dateTime = new DateTime('now', $timezone);
+
+                        $formattedTime = $dateTime->format('H:i:s');
+
+                        $this->logger->info("[$formattedTime] - REFUND EVENT REQUEST GENERATED FOR ZAMP TRANSACTION", [
+                            'request' => $refund_json
+                        ]);
+
+                        $curl_whole_refund = curl_init();
+
+                        $url_whole_refund = "https://api.zamp.com/transactions";
+            
+                        curl_setopt_array($curl_whole_refund, [
+                            CURLOPT_URL => $url_whole_refund,
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_ENCODING => "",
+                            CURLOPT_MAXREDIRS => 10,
+                            CURLOPT_TIMEOUT => 30,
+                            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                            CURLOPT_CUSTOMREQUEST => "POST",
+                            CURLOPT_POSTFIELDS => json_encode($refund_json),
+                            CURLOPT_HTTPHEADER => [
+                            "Accept: application/json",
+                            "Content-Type: application/json",
+                            "Authorization: Bearer " . $bear_token
+                            ],
+                        ]);
+            
+                        curl_setopt($curl_whole_refund, CURLOPT_HEADER, true);
+            
+                        $response_whole_refund = curl_exec($curl_whole_refund);
+            
+                        header("Access-Control-Allow-Origin: *");
+
+            
+                        $err_whole_refund = curl_error($curl_whole_refund);
+            
+                        curl_close($curl_whole_refund);
+
+                        $dateTime = new DateTime('now', $timezone);
+
+                        $formattedTime = $dateTime->format('H:i:s');
+            
+                        if ($err_whole_refund){
+
+                            $this->logger->error("[$formattedTime] - ERROR IN REFUND EVENT RESPONSE FROM ZAMP TRANSACTION", [
+                                'error' => $err_whole_refund
+                            ]);
+                            return;
+                        } else {
+                            if($response_whole_refund){
+
+                                $dateTime = new DateTime('now', $timezone);
+
+                                $formattedTime = $dateTime->format('H:i:s');
+
+                                $responseParts_whole_refund = explode("\r\n\r\n", $response_whole_refund, 2);
+                                $httpResponseHeaders_whole_refund = isset($responseParts_whole_refund[0]) ? $responseParts_whole_refund[0] : '';
+                                $jsonResponseBody_whole_refund = isset($responseParts_whole_refund[1]) ? $responseParts_whole_refund[1] : '';
+
+                                $this->logger->info("[$formattedTime] - REFUND EVENT RESPONSE FROM ZAMP TRANSACTION", [
+                                    'http_status' => strtok($httpResponseHeaders_whole_refund, "\r\n"),
+                                    'response' => json_decode($jsonResponseBody_whole_refund, true),
+                                    'timestamp' => (new DateTime('now', new DateTimeZone('UTC')))->format('H:i:s')
+                                ]);
+
+                                $zamp_trans = [
+                                    'id' => json_decode($transaction_info)->id,
+                                    'orderNumber' => $order_number,
+                                    'status' => 'refunded'
+                                ];
+
+                                $this->zampTransactionsRepository->update([$zamp_trans], $event->getContext());
+                            }
+                        }
+                    }
                 }
-
-                [$headers_origin, $body_origin] = explode("\r\n\r\n", $response_origin, 2);
-                $origin_transaction = json_decode($body_origin ?? '{}');
-
-                $this->logger->info("[$formattedTime] - REFUND EVENT RESPONSE FROM ZAMP ORIGINAL TRANSACTION RETRIEVAL", [
-                    'http_status' => strtok($headers_origin, "\r\n"),
-                    'response' => $origin_transaction
-                ]);
-
-                $refund_json = new \stdClass();
-                $refund_json->id = "REF-" . $origin_transaction->id;
-                $refund_json->name = "REF-" . $origin_transaction->name;
-                $refund_json->parentId = $origin_transaction->id;
-                $refund_json->transactedAt = date('Y-m-d H:i:s');
-                $refund_json->entity = $origin_transaction->entity ?? null;
-                $refund_json->purpose = $origin_transaction->purpose ?? null;
-                $refund_json->discount = $origin_transaction->discount ?? 0;
-
-                $refund_items_arr = [];
-                foreach ($origin_transaction->lineItems as $lineItem) {
-                    $item_obj = new \stdClass();
-                    $item_obj->quantity = ($lineItem->quantity ?? 0) * -1;
-                    $item_obj->id = $lineItem->id ?? '';
-                    $item_obj->amount = round($lineItem->amount ?? 0, 2);
-                    $item_obj->productName = $lineItem->productName ?? '';
-                    $item_obj->productSku = $lineItem->productSku ?? '';
-                    $item_obj->productTaxCode = $lineItem->productTaxCode ?? '';
-                    $refund_items_arr[] = $item_obj;
-                }
-
-                $refund_json->subtotal = round(($origin_transaction->subtotal ?? 0) * -1, 2);
-                $refund_json->shippingHandling = round(($origin_transaction->shippingHandling ?? 0) * -1, 2);
-                $refund_json->total = round(($origin_transaction->total ?? 0) * -1, 2);
-                $refund_json->taxCollected = round(($origin_transaction->taxCollected ?? 0) * -1, 2);
-
-                $refund_json->shipToAddress = $origin_transaction->shipToAddress ?? new \stdClass();
-                $refund_json->lineItems = $refund_items_arr;
-
-                $this->logger->info("[$formattedTime] - REFUND EVENT REQUEST GENERATED FOR ZAMP TRANSACTION", [
-                    'request' => $refund_json
-                ]);
-
-                $curl_refund = curl_init();
-                curl_setopt_array($curl_refund, [
-                    CURLOPT_URL => 'https://api.zamp.com/transactions',
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_ENCODING => '',
-                    CURLOPT_MAXREDIRS => 10,
-                    CURLOPT_TIMEOUT => 30,
-                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                    CURLOPT_CUSTOMREQUEST => 'POST',
-                    CURLOPT_POSTFIELDS => json_encode($refund_json),
-                    CURLOPT_HTTPHEADER => [
-                        'Accept: application/json',
-                        'Content-Type: application/json',
-                        'Authorization: Bearer ' . $bear_token
-                    ],
-                    CURLOPT_HEADER => true
-                ]);
-
-                $response_refund = curl_exec($curl_refund);
-                $err_refund = curl_error($curl_refund);
-                curl_close($curl_refund);
-
-                $dateTime = new DateTime('now', $timezone);
-                $formattedTime = $dateTime->format('H:i:s');
-
-                if ($err_refund) {
-                    $this->logger->error("[$formattedTime] - ERROR IN REFUND EVENT RESPONSE FROM ZAMP TRANSACTION", [
-                        'error' => $err_refund
-                    ]);
-                    return;
-                }
-
-                [$headers_refund, $body_refund] = explode("\r\n\r\n", $response_refund, 2);
-
-                $this->logger->info("[$formattedTime] - REFUND EVENT RESPONSE FROM ZAMP TRANSACTION", [
-                    'http_status' => strtok($headers_refund, "\r\n"),
-                    'response' => json_decode($body_refund, true)
-                ]);
-
-                $zamp_trans = [
-                    'id' => $decoded_info->id ?? null,
-                    'orderNumber' => $order->getOrderNumber(),
-                    'status' => 'refunded'
-                ];
-
-                $this->zampTransactionsRepository->update([$zamp_trans], $context);
-            }
-
-        }
+            }    
+        }         
     }
 
 }

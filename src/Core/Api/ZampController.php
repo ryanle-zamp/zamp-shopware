@@ -57,13 +57,16 @@ class ZampController extends AbstractController
      * @return JsonResponse Response indicating if the token is valid
      */
 	#[Route('/api/v1/_action/zamp-tax/test-api', name: 'api.zamp_tax.test_api', methods: ["POST", "GET"])]
-	public function testApiToken(): JsonResponse
+	public function testApiToken(Request $request): JsonResponse
 	{
         $timezone = new DateTimeZone('UTC');
 
-		$date = date('Y-m-d');
+		$token = trim($request->get('token', ''));
+		if (!preg_match('/^[A-Za-z0-9\-_.]+$/', $token)) {
+			return new JsonResponse(['valid' => false, 'message' => 'Invalid token format'], 400);
+		}
 
-		$token = $_POST['token'];
+
 		$valid = "";
 
 		$curl = curl_init();
@@ -216,7 +219,7 @@ class ZampController extends AbstractController
 
 
 	#[Route('/api/v1/_action/zamp-tax/sync-order', name: 'api.zamp_tax.sync_order', methods: ["POST", "GET"])]
-	public function syncHistoricalOrder(): JsonResponse
+	public function syncHistoricalOrder(Request $request): JsonResponse
 	{
 		$timezone = new DateTimeZone('UTC');
 		$formattedTime = (new DateTime('now', $timezone))->format('H:i:s');
@@ -244,7 +247,7 @@ class ZampController extends AbstractController
 			'D' => 'FEDERAL_GOV', 'K' => 'DIRECT_PAY', 'L' => 'LESSOR'
 		];
 
-		$order_id = $_POST['order_id'] ?? null;
+		$order_id = $request->get('order_id');
 		$zamp_settings = $this->getZampSettings();
 		$taxable_states = $zamp_settings['taxable_states'] ? explode(',', $zamp_settings['taxable_states']) : [];
 		$token = $zamp_settings['api_token'];
@@ -275,18 +278,28 @@ class ZampController extends AbstractController
 		}
 
 		$delivery = $order->getDeliveries()->first();
-		$shippingAddress = $delivery?->getShippingOrderAddress();
-		$street = $shippingAddress?->getStreet() ?? '';
-		$city = $shippingAddress?->getCity() ?? '';
-		$zip = $shippingAddress?->getZipcode() ?? '';
-		$state = isset($shippingAddress) ? $state_shortcodes[$shippingAddress->getCountryState()->getName()] : '';
+		$shippingAddress = null;
+		if ($delivery !== null) {
+			$shippingAddress = $delivery->getShippingOrderAddress();
+		}
+
+		$street = $shippingAddress !== null ? $shippingAddress->getStreet() : '';
+		$city = $shippingAddress !== null ? $shippingAddress->getCity() : '';
+		$zip = $shippingAddress !== null ? $shippingAddress->getZipcode() : '';
+		$state = '';
+
+		if ($shippingAddress !== null && $shippingAddress->getCountryState() !== null) {
+			$stateName = $shippingAddress->getCountryState()->getName();
+			$state = isset($state_shortcodes[$stateName]) ? $state_shortcodes[$stateName] : '';
+		}
+
 
 		$formattedDate = $order->createdAt->format('Y-m-d H:i:s');
 
 		if ($trans_enabled && in_array($state, $taxable_states)) {
 			$zamp_items_arr = [];
 			$subtotal = 0;
-			$zamp_json = new \stdClass();
+			$zamp_json = new stdClass();
 			$zamp_json->id = "SW-{$order_id}-01";
 			$zamp_json->name = 'INV-' . $zamp_json->id;
 			$zamp_json->transactedAt = $formattedDate;
@@ -300,7 +313,7 @@ class ZampController extends AbstractController
 					continue;
 				}
 
-				$item_obj = new \stdClass();
+				$item_obj = new stdClass();
 				$unit_price = $item->unitPrice;
 				$total_price = $item->totalPrice;
 				$subtotal += (float) number_format($total_price, 2);
@@ -322,7 +335,7 @@ class ZampController extends AbstractController
 			$zamp_json->shippingHandling = $order->shippingCosts->getTotalPrice();
 			$zamp_json->total = $zamp_json->subtotal + $zamp_json->shippingHandling;
 
-			$shipToAddress = new \stdClass();
+			$shipToAddress = new stdClass();
 			$shipToAddress->line1 = $street;
 			$shipToAddress->line2 = 'empty';
 			$shipToAddress->city = $city;
@@ -389,7 +402,7 @@ class ZampController extends AbstractController
 				$err2 = curl_error($curl2);
 				curl_close($curl2);
 
-				$new_resp = new \stdClass();
+				$new_resp = new stdClass();
 				if ($err2) {
 					$this->logger->error("{$formattedTime} - ERROR REPORTING HISTORICAL SYNC TRANSACTION", [
 						'error' => $err2
@@ -406,11 +419,13 @@ class ZampController extends AbstractController
 						'response' => $zamp_resp
 					]);
 
-					$new_resp->status = match (true) {
-						$zamp_resp->code === "CONFLICT" && $zamp_resp->message === "Transaction already exists" => "exists",
-						$zamp_resp->id === $zamp_json->id => "completed",
-						default => "failed"
-					};
+					if ($zamp_resp->code === "CONFLICT" && $zamp_resp->message === "Transaction already exists") {
+						$new_resp->status = "exists";
+					} elseif ($zamp_resp->id === $zamp_json->id) {
+						$new_resp->status = "completed";
+					} else {
+						$new_resp->status = "failed";
+					}
 				}
 
 				return new JsonResponse($new_resp);
