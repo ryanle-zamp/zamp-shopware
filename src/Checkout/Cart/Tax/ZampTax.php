@@ -66,7 +66,7 @@ class ZampTax extends AbstractTaxProvider
         $state_shortcodes = [/* ... unchanged ... */];
 
         $zamp_settings = $this->getZampSettings();
-        $$taxable_states = !empty($zamp_settings['taxable_states']) 
+        $taxable_states = !empty($zamp_settings['taxable_states']) 
 			? explode(',', $zamp_settings['taxable_states']) 
 			: [];
         $bear_token = $zamp_settings['api_token'];

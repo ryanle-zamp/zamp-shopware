@@ -90,6 +90,10 @@
         <service id="ZampTax\ScheduledTask\DeleteOldZampTaxLogsHandler" public="true">
             <tag name="messenger.message_handler"/>
         </service>
+        
+        <service id="ZampTax\ScheduledTask\DeleteOldZampTaxLogs">
+            <tag name="shopware.scheduled_task" />
+        </service>
 
     </services>
 </container>

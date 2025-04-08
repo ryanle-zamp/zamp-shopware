@@ -2,14 +2,23 @@
 
 namespace ZampTax\ScheduledTask;
 
-use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Shopware\Core\Framework\MessageQueue\Handler\ScheduledTaskHandler;
 use Shopware\Core\Framework\Context;
 use Symfony\Component\Finder\Finder;
+use Psr\Log\LoggerInterface;
 
-#[AsMessageHandler]
 class DeleteOldZampTaxLogsHandler extends ScheduledTaskHandler
 {
+    /**
+     * @var LoggerInterface
+     */
+    private $logger;
+
+    public function __construct(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
+    }
+
     public static function getHandledMessages(): iterable
     {
         return [DeleteOldZampTaxLogs::class];
@@ -17,7 +26,7 @@ class DeleteOldZampTaxLogsHandler extends ScheduledTaskHandler
 
     public function run(): void
     {
-        $logDirectory = dirname(__DIR__, 5) . '/var/log'; // Adjust path if needed
+        $logDirectory = dirname(__DIR__, 5) . '/var/log';
 
         $finder = new Finder();
         $finder->files()
@@ -26,7 +35,15 @@ class DeleteOldZampTaxLogsHandler extends ScheduledTaskHandler
             ->date('until 6 months ago');
 
         foreach ($finder as $file) {
-            @unlink($file->getRealPath());
+            $filePath = $file->getRealPath();
+
+            if (is_file($filePath)) {
+                try {
+                    unlink($filePath);
+                } catch (\Throwable $e) {
+                    $this->logger->warning("Failed to delete file: $filePath", ['exception' => $e]);
+                }
+            }
         }
     }
 }

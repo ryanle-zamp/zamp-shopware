@@ -400,10 +400,6 @@ Shopware.Component.register('zamp-tax-main-page', {
             this.activeTab = tab;           
         },
 
-		onTabChange(tab){
-			this.activeTab = tab;			
-		},
-
 		syncHistory(e){
 			e.preventDefault();
 
