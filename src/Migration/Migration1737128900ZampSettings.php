@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS `zamp_settings` (
     `taxable_states` VARCHAR(255) DEFAULT Null,
     `calculations_enabled` TINYINT(1) DEFAULT 0,
     `transactions_enabled` TINYINT(1) DEFAULT 0,
-    `retain_logs` TINYINT(1) DEFAULT 0,
     PRIMARY KEY (id)
 )
     ENGINE = InnoDB

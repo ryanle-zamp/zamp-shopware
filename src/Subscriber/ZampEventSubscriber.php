@@ -36,7 +36,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
 	/** @var EntityRepository */
     private $taxProviderRepository;
     /** @var LoggerInterface */
-    private $zampLogger;
+    private $logger;
 
     /**
      * Constructor
@@ -46,7 +46,7 @@ class ZampEventSubscriber implements EventSubscriberInterface
      * @param EntityRepository $orderTransactionRepository Order transaction repository
      * @param EntityRepository $zampTransactionsRepository Zamp transactions repository
      * @param EntityRepository $taxProviderRepository Tax provider repository
-     * @param LoggerInterface $zampTaxLogger
+     * @param LoggerInterface $logger
      */
     public function __construct(
 		Connection $connection,
