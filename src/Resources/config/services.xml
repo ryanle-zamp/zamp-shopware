@@ -87,5 +87,9 @@
             <argument>200</argument>
         </service>
 
+        <service id="ZampTax\ScheduledTask\DeleteOldZampTaxLogsHandler" public="true">
+            <tag name="messenger.message_handler"/>
+        </service>
+
     </services>
 </container>

@@ -13,6 +13,8 @@ use Shopware\Core\Framework\Plugin\Context\UninstallContext;
 use Shopware\Core\Framework\Plugin\Context\UpdateContext;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
+use Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTaskRegistry;
+use ZampTax\ScheduledTask\DeleteOldZampTaxLogs;
 
 /**
  * Zamp Tax integration plugin for Shopware 6
@@ -27,6 +29,9 @@ class ZampTax extends Plugin
     public function install(InstallContext $installContext): void
     {
         $context = $installContext->getContext();
+
+		$task = new DeleteOldZampTaxLogs();
+		$this->container->get(ScheduledTaskRegistry::class)->registerTask($task);
 
         $ruleRepo = $this->container->get('rule.repository');
 

@@ -35,7 +35,8 @@ class ZampEventSubscriber implements EventSubscriberInterface
     private $zampTransactionsRepository;
 	/** @var EntityRepository */
     private $taxProviderRepository;
-    private LoggerInterface $logger;
+    /** @var LoggerInterface */
+    private $zampLogger;
 
     /**
      * Constructor
