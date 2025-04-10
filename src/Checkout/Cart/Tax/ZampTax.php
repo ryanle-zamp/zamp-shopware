@@ -1,12 +1,12 @@
-<?php
+<?php 
 
 namespace ZampTax\Checkout\Cart\Tax;
 
+// Add these use statements at the top of your PHP file
 use DateTime;
 use DateTimeZone;
 use Shopware\Core\Checkout\Cart\Cart;
 use Doctrine\DBAL\Connection;
-use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Checkout\Cart\LineItem\LineItem;
 use Shopware\Core\Checkout\Cart\Tax\Struct\CalculatedTax;
@@ -20,298 +20,487 @@ use stdClass;
 
 class ZampTax extends AbstractTaxProvider
 {
+	/**
+	 * @var Connection
+	 */
     private $connection;
-    private $snippetService;
-    private $logger;
+	/**
+	 * @var SnippetService
+	 */
+	private $snippetService;
 
-    public function __construct(Connection $connection, SnippetService $snippetService, LoggerInterface $logger)
+    public function __construct(Connection $connection, SnippetService $snippetService)
     {
         $this->connection = $connection;
-        $this->snippetService = $snippetService;
-        $this->logger = $logger;
+		$this->snippetService = $snippetService;
     }
 
     public function getZampSettings()
     {
-        $sql = '
-            SELECT api_token, taxable_states, calculations_enabled, transactions_enabled
-            FROM zamp_settings
+        $sql =  '
+            SELECT
+                api_token,
+                taxable_states,
+                calculations_enabled,
+                transactions_enabled
+            FROM
+                zamp_settings
             LIMIT 1
         ';
-        return $this->connection->fetchAssociative($sql);
+
+        $result = $this->connection->fetchAssociative($sql);
+
+        return $result;
     }
 
     public function getZampCustomerTaxExemption($customerGroupId)
     {
-        return $this->connection->fetchAssociative(
-            'SELECT * FROM customer_group_translation WHERE customer_group_id = :id LIMIT 1',
-            ['id' => $customerGroupId]
-        );
+        $sql =  '
+            SELECT
+                *
+            FROM
+                customer_group_translation
+            WHERE
+                customer_group_id = :customerGroupId
+            LIMIT 1
+        ';
+
+        $result = $this->connection->fetchAssociative($sql, [
+            'customerGroupId' => $customerGroupId
+        ]);
+
+        return $result;
     }
 
     public function getZampProductTaxCode($productId)
     {
-        return $this->connection->fetchAssociative(
-            'SELECT * FROM zamp_product_tax_code WHERE product_id = :id LIMIT 1',
-            ['id' => $productId]
-        );
+        $sql =  '
+            SELECT
+                *
+            FROM
+                zamp_product_tax_code
+            WHERE
+                product_id = :productId
+            LIMIT 1
+        ';
+
+        $result = $this->connection->fetchAssociative($sql, [
+            'productId' => $productId
+        ]);
+
+        return $result;
     }
 
     public function provide(Cart $cart, SalesChannelContext $context): TaxProviderResult
     {
+        // Set the timezone to Central Standard Time
         $timezone = new DateTimeZone('UTC');
-        $formattedTime = (new DateTime('now', $timezone))->format('H:i:s');
 
-            $ava_tax_exempt_codes = array(
-                'A' => 'FEDERAL_GOV', 
-                'B' => 'STATE_GOV', 
-                'C' => 'TRIBAL', 
-                'N' => 'LOCAL_GOV', 
-                'E' => 'NON_PROFIT', 
-                'F' => 'RELIGIOUS', 
-                'G' => 'WHOLESALER', 
-                'H' => 'AGRICULTURAL', 
-                'I' => 'INDUSTRIAL_PROCESSING', 
-                'J' => 'DIRECT_PAY', 
-                'M' => 'EDUCATIONAL', 
-                'D' => 'FEDERAL_GOV', 
-                'K' => 'DIRECT_PAY', 
-                'L' => 'LESSOR'
-            );
-            
-            $state_shortcodes = array(
-                "Alabama" => "AL",
-                "Alaska" => "AK",
-                "Arizona" => "AZ",
-                "Arkansas" => "AR",
-                "California" => "CA",
-                "Colorado" => "CO",
-                "Connecticut" => "CT",
-                "Delaware" => "DE",
-                "District of Columbia" => "DC",
-                "Florida" => "FL",
-                "Georgia" => "GA",
-                "Hawaii" => "HI",
-                "Idaho" => "ID",
-                "Illinois"=> "IL",
-                "Indiana" => "IN",
-                "Iowa" => "IA",
-                "Kansas" => "KS",
-                "Kentucky" => "KY",
-                "Louisiana" => "LA",
-                "Maine" => "ME",
-                "Maryland" => "MD",
-                "Massachusetts" => "MA",
-                "Michigan" => "MI",
-                "Minnesota" => "MN",
-                "Mississippi" => "MS",
-                "Missouri" => "MO",
-                "Montana" => "MT",
-                "Nebraska" => "NE",
-                "Nevada" => "NV",
-                "New Hampshire" => "NH",
-                "New Jersey" => "NJ",
-                "New Mexico" => "NM",
-                "New York" => "NY",
-                "North Carolina" => "NC",
-                "North Dakota" => "ND",
-                "Ohio" => "OH",
-                "Oklahoma" => "OK",
-                "Oregon" => "OR",
-                "Pennsylvania" => "PA",
-                "Puerto Rico" => "PR",
-                "Rhode Island" => "RI",
-                "South Carolina" => "SC",
-                "South Dakota" => "SD",
-                "Tennessee" => "TN",
-                "Texas" => "TX",
-                "Utah" => "UT",
-                "Vermont" => "VT",
-                "Virginia" => "VA",
-                "Washington" => "WA",
-                "West Virginia" => "WV",
-                "Wisconsin" => "WI",
-                "Wyoming" => "WY"
-            );
+		$ava_tax_exempt_codes = array(
+            'A' => 'FEDERAL_GOV', 
+            'B' => 'STATE_GOV', 
+            'C' => 'TRIBAL', 
+            'N' => 'LOCAL_GOV', 
+            'E' => 'NON_PROFIT', 
+            'F' => 'RELIGIOUS', 
+            'G' => 'WHOLESALER', 
+            'H' => 'AGRICULTURAL', 
+            'I' => 'INDUSTRIAL_PROCESSING', 
+            'J' => 'DIRECT_PAY', 
+            'M' => 'EDUCATIONAL', 
+            'D' => 'FEDERAL_GOV', 
+            'K' => 'DIRECT_PAY', 
+            'L' => 'LESSOR'
+        );
+
+        $zamp_tax_codes = array(
+            'FEDERAL_GOV' => 'FEDERAL_GOV', 
+            'STATE_GOV' => 'STATE_GOV', 
+            'TRIBAL' => 'TRIBAL', 
+            'LOCAL_GOV' => 'LOCAL_GOV', 
+            'NON_PROFIT' => 'NON_PROFIT', 
+            'RELIGIOUS' => 'RELIGIOUS', 
+            'WHOLESALER' => 'WHOLESALER', 
+            'AGRICULTURAL' => 'AGRICULTURAL', 
+            'INDUSTRIAL_PROCESSING' => 'INDUSTRIAL_PROCESSING', 
+            'DIRECT_PAY' => 'DIRECT_PAY', 
+            'EDUCATIONAL' => 'EDUCATIONAL', 
+            'LESSOR' => 'LESSOR',
+            'SNAP' => 'SNAP',
+            'MEDICAL' => 'MEDICAL',
+            'DATA_CENTER' => 'DATA_CENTER',
+            'EDU_PRIVATE' => 'EDU_PRIVATE',
+            'EDU_PUBLIC' => 'EDU_PUBLIC'
+        );
+
+		$zamp_exempt_code = "";
+
+		$cartPriceTaxes = [];
+        $lineItemTaxes = [];
+
+        $taxable = false;
+
+		$customer_group_id = $context->getCurrentCustomerGroup()->id;
+
+        $customer_group_custom_fields = $context->getCurrentCustomerGroup()->getCustomFields();
+
+        if(count($customer_group_custom_fields) && isSet($customer_group_custom_fields['tax_exempt_code'])){
+            $zamp_exempt_code = $customer_group_custom_fields['tax_exempt_code'];
+        }
+
+        if(isset($zamp_exempt_code) && trim($zamp_exempt_code) != ""){
+            if(strlen(trim($zamp_exempt_code)) == 1){
+                $zamp_exempt_code = $ava_tax_exempt_codes[trim($zamp_exempt_code)];
+            } else {
+                $zamp_exempt_code = trim($zamp_exempt_code);
+            }
+        }
+
+        $state_shortcodes = array(
+            "Alabama" => "AL",
+            "Alaska" => "AK",
+            "Arizona" => "AZ",
+            "Arkansas" => "AR",
+            "California" => "CA",
+            "Colorado" => "CO",
+            "Connecticut" => "CT",
+            "Delaware" => "DE",
+            "District of Columbia" => "DC",
+            "Florida" => "FL",
+            "Georgia" => "GA",
+            "Hawaii" => "HI",
+            "Idaho" => "ID",
+            "Illinois"=> "IL",
+            "Indiana" => "IN",
+            "Iowa" => "IA",
+            "Kansas" => "KS",
+            "Kentucky" => "KY",
+            "Louisiana" => "LA",
+            "Maine" => "ME",
+            "Maryland" => "MD",
+            "Massachusetts" => "MA",
+            "Michigan" => "MI",
+            "Minnesota" => "MN",
+            "Mississippi" => "MS",
+            "Missouri" => "MO",
+            "Montana" => "MT",
+            "Nebraska" => "NE",
+            "Nevada" => "NV",
+            "New Hampshire" => "NH",
+            "New Jersey" => "NJ",
+            "New Mexico" => "NM",
+            "New York" => "NY",
+            "North Carolina" => "NC",
+            "North Dakota" => "ND",
+            "Ohio" => "OH",
+            "Oklahoma" => "OK",
+            "Oregon" => "OR",
+            "Pennsylvania" => "PA",
+            "Puerto Rico" => "PR",
+            "Rhode Island" => "RI",
+            "South Carolina" => "SC",
+            "South Dakota" => "SD",
+            "Tennessee" => "TN",
+            "Texas" => "TX",
+            "Utah" => "UT",
+            "Vermont" => "VT",
+            "Virginia" => "VA",
+            "Washington" => "WA",
+            "West Virginia" => "WV",
+            "Wisconsin" => "WI",
+            "Wyoming" => "WY"
+        );
 
         $zamp_settings = $this->getZampSettings();
-        $taxable_states = !empty($zamp_settings['taxable_states']) 
-			? explode(',', $zamp_settings['taxable_states']) 
-			: [];
+
+        $taxable_states = explode(',', $zamp_settings['taxable_states']);
         $bear_token = $zamp_settings['api_token'];
         $calc_enabled = $zamp_settings['calculations_enabled'];
 
-        $zamp_exempt_code = '';
-        $customer_group_custom_fields = $context->getCurrentCustomerGroup()->getCustomFields();
-        if (!empty($customer_group_custom_fields['tax_exempt_code'])) {
-            $code = trim($customer_group_custom_fields['tax_exempt_code']);
-            $zamp_exempt_code = strlen($code) === 1 ? $ava_tax_exempt_codes[$code] ?? '' : $code;
-        }
-
-        $lineItemTaxes = [];
-        $cartPriceTaxes = [];
-        $taxable = false;
-
-        if (!$calc_enabled) {
+		if(!$calc_enabled){
             foreach ($cart->getLineItems() as $lineItem) {
-                $price = $lineItem->getPrice()->getTotalPrice();
+
+
+			
                 $taxRate = 0;
+                $price = $lineItem->getPrice()->getTotalPrice();
                 $tax = 0;
-
-                $collection = new CalculatedTaxCollection([new CalculatedTax($tax, $taxRate, $price)]);
-                $lineItemTaxes[$lineItem->getUniqueIdentifier()] = $collection;
-                $cartPriceTaxes[$lineItem->getUniqueIdentifier()] = $collection;
+    
+                // shopware will look for the `uniqueIdentifier` property of the lineItem to identify this lineItem even in nested-line-item structures
+                $lineItemTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                    [
+                        new CalculatedTax($tax, $taxRate, $price),
+                    ]
+                );
+    
+                $cartPriceTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                    [
+                        new CalculatedTax($tax, $taxRate, $price),
+                    ]
+                );				
             }
 
-            $this->logger->info("ZampTax skipped calculation (disabled)", [
-                'time' => $formattedTime,
-                'cartTaxes' => $cartPriceTaxes,
-            ]);
+            // Create a new DateTime object
+            $dateTime = new DateTime('now', $timezone);
+                
+            // Format the date and time as needed
+            $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
 
-            return new TaxProviderResult($lineItemTaxes, $cartPriceTaxes);
-        }
+			$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+			fwrite($hook_file, "\n\n");
+			fwrite($hook_file, $formattedTime . " - CART PRICE TAXES GENERATED W/O ZAMP CALCULATION.\n");
+            fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
+			fclose($hook_file);	
+        } else {
 
-        // Check delivery state
-        if ($cart->getDeliveries()->count()) {
-            $delivery = $cart->getDeliveries()->first();
-            $state_name = $delivery->getLocation()->getState()->name;
+            if(!empty($cart->getDeliveries())){
 
-            if (in_array($state_shortcodes[$state_name] ?? '', $taxable_states)) {
-                $taxable = true;
+                $del = $cart->getDeliveries()->first();
+				$address = $del->getLocation()->getAddress();
+
+				$street_address = $address->street;
+				$zipcode = $address->zipcode;
+				$city = $address->city;
+				
+				$state_obj = $del->getLocation()->getState();
+
+				$countryIso = $del->getLocation()->getCountry()->getIso();
+
+				$state_name = $state_obj->name;
+    
+                if(in_array($state_shortcodes[$state_name], $taxable_states)){
+                    $taxable = true;
+                }		
             }
-        }
+            if($taxable){
 
-        if ($taxable) {
-            $zamp_items_arr = [];
-            $subtotal = 0;
+                $zamp_items_arr = array();
+                $subtotal = 0;
+                $zamp_json = new stdClass();
+                $zamp_json->id = "CALC-" . $cart->getHash();
+                $zamp_json->name = 'INV-' . $zamp_json->id;
+                $zamp_json->transactedAt = date('Y-m-d H:i:s');
+                $zamp_json->entity = $zamp_exempt_code != "" ? $zamp_exempt_code : null;
+                $zamp_json->purpose = $zamp_exempt_code == "WHOLESALER" ? "RESALE" : null;
+				$zamp_json->discount = 0;
+                   
+    
+                foreach ($cart->getLineItems() as $item) {
 
-            $zamp_json = (object) [
-                'id' => 'CALC-' . $cart->getHash(),
-                'name' => 'INV-CALC-' . $cart->getHash(),
-                'transactedAt' => date('Y-m-d H:i:s'),
-                'entity' => $zamp_exempt_code ?: null,
-                'purpose' => $zamp_exempt_code === 'WHOLESALER' ? 'RESALE' : null,
-                'discount' => 0,
-            ];
+					$type = $item->getType();
 
-            foreach ($cart->getLineItems() as $item) {
-                if ($item->getType() === 'promotion') {
-                    $zamp_json->discount += $item->getPrice()->getTotalPrice() * -1;
-                    continue;
+					if($type == 'promotion'){
+						$zamp_json->discount += ($item->getPrice()->getTotalPrice()) * -1;
+					} else {
+						$item_price = $item->getPrice()->getUnitPrice();
+
+						$line_price = $item->getPrice()->getTotalPrice();
+    
+                    	$item_obj = new stdClass();
+                    	$item_obj->quantity = $item->getQuantity();
+                   		$subtotal += $line_price;
+                    	$item_obj->id = $item->getId();
+
+                    	$item_obj->amount = (float) number_format($item_price, 2, '.', '');
+                    	$item_obj->productName = $item->getLabel();
+                    	$item_obj->productSku = $item->getPayloadValue('productNumber');
+                        $ptc = $this->getZampProductTaxCode($item_obj->id) ? $this->getZampProductTaxCode($item_obj->id)['product_tax_code'] : '';
+                    	$item_obj->productTaxCode = $ptc !== '' && (substr($ptc, 0, 5) == "R_TPP" || substr($ptc, 0, 5) == "R_SRV" || substr($ptc, 0, 5) == "R_DIG") ? $ptc : "R_TPP";
+    
+                    	array_push($zamp_items_arr, $item_obj);
+					}
+                    
                 }
 
-                $price = $item->getPrice()->getUnitPrice();
-                $lineTotal = $item->getPrice()->getTotalPrice();
-                $subtotal += $lineTotal;
+				    
+                $zamp_json->subtotal = $subtotal - $zamp_json->discount;
+                $zamp_json->shippingHandling = $cart->getDeliveries()->first()->getShippingCosts()->getTotalPrice();
+                $zamp_json->total = $zamp_json->subtotal + $zamp_json->shippingHandling;
+    
+                $zamp_json->shipToAddress = new stdClass();
+                $zamp_json->shipToAddress->line1 = $street_address != "" ? $street_address : "empty";
+                $zamp_json->shipToAddress->line2 = "empty";
+                $zamp_json->shipToAddress->city = $city;
+                $zamp_json->shipToAddress->state = $state_shortcodes[$state_name];
+                $zamp_json->shipToAddress->zip = $zipcode;
+                $zamp_json->shipToAddress->country = "US";
+                $zamp_json->lineItems = $zamp_items_arr;
+    
+                $zamp_obj = json_encode($zamp_json);
 
-                $ptcData = $this->getZampProductTaxCode($item->getId());
-                $ptc = $ptcData['product_tax_code'] ?? '';
-                $ptc = (preg_match('/^R_(TPP|SRV|DIG)/', $ptc)) ? $ptc : 'R_TPP';
+                
+                
+                // Create a new DateTime object
+                $dateTime = new DateTime('now', $timezone);
+                
+                // Format the date and time as needed
+                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
 
-                $zamp_items_arr[] = (object) [
-                    'quantity' => $item->getQuantity(),
-                    'id' => $item->getId(),
-                    'amount' => (float) number_format($price, 2, '.', ''),
-                    'productName' => $item->getLabel(),
-                    'productSku' => $item->getPayloadValue('productNumber'),
-                    'productTaxCode' => $ptc,
-                ];
-            }
-
-            $zamp_json->subtotal = $subtotal - $zamp_json->discount;
-            $zamp_json->shippingHandling = $cart->getDeliveries()->first()->getShippingCosts()->getTotalPrice();
-            $zamp_json->total = $zamp_json->subtotal + $zamp_json->shippingHandling;
-
-            $addr = $cart->getDeliveries()->first()->getLocation()->getAddress();
-            $zamp_json->shipToAddress = (object) [
-                'line1' => $addr->street ?: 'empty',
-                'line2' => 'empty',
-                'city' => $addr->city,
-                'state' => $state_shortcodes[$addr->getState()->name] ?? '',
-                'zip' => $addr->zipcode,
-                'country' => 'US',
-            ];
-            $zamp_json->lineItems = $zamp_items_arr;
-
-            $this->logger->info("ZampTax request initiated", [
-                'time' => $formattedTime,
-                'request' => $zamp_json,
-            ]);
-
-            $curl = curl_init();
-            curl_setopt_array($curl, [
-                CURLOPT_URL => "https://api.zamp.com/calculations",
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_CUSTOMREQUEST => "POST",
-                CURLOPT_POSTFIELDS => json_encode($zamp_json),
-                CURLOPT_HTTPHEADER => [
+				$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+				fwrite($hook_file, "\n\n");
+				fwrite($hook_file, $formattedTime . " - INITIAL REQUEST FOR ZAMP CALCULATION GENERATED.\n ");
+                fwrite($hook_file, "REQUEST: " . json_encode($zamp_json, JSON_PRETTY_PRINT));
+				fclose($hook_file);	
+    
+                $curl = curl_init();
+            
+                $url = "https://api.zamp.com/calculations";
+    
+                curl_setopt_array($curl, [
+                    CURLOPT_URL => $url,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_ENCODING => "",
+                    CURLOPT_MAXREDIRS => 10,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    CURLOPT_CUSTOMREQUEST => "POST",
+                    CURLOPT_POSTFIELDS => $zamp_obj,
+                    CURLOPT_HTTPHEADER => [
                     "Accept: application/json",
                     "Content-Type: application/json",
                     "Authorization: Bearer " . $bear_token
-                ],
-            ]);
-            curl_setopt($curl, CURLOPT_HEADER, true);
-            $response = curl_exec($curl);
-            $err = curl_error($curl);
-            curl_close($curl);
-
-            if ($err) {
-                $this->logger->error("ZampTax API error", [
-                    'time' => $formattedTime,
-                    'error' => $err,
+                    ],
                 ]);
-            } else {
-                [$headers, $body] = explode("\r\n\r\n", $response, 2);
-                $zamp_resp = json_decode($body);
+    
+                curl_setopt($curl, CURLOPT_HEADER, true);
+                
+                $response = curl_exec($curl);
+        
+                header("Access-Control-Allow-Origin: *");
+        
+                // die(print_r(json_decode($response3)));
+        
+                $err = curl_error($curl);
+        
+                curl_close($curl);
+        
+                if ($err){
 
-                $this->logger->info("ZampTax API response received", [
-                    'time' => $formattedTime,
-                    'status' => strtok($headers, "\r\n"),
-                    'response' => $zamp_resp,
-                ]);
+                    // Create a new DateTime object
+                    $dateTime = new DateTime('now', $timezone);
+                                    
+                    // Format the date and time as needed
+                    $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
 
-                foreach ($zamp_resp->lineItems ?? [] as $line) {
-                    $line_tax = 0.00;
-                    $line_rate = 0.0;
+                    $hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+                    fwrite($hook_file, "\n\n");
+                    fwrite($hook_file, $formattedTime . " - ERROR IN RESPONSE FROM ZAMP CALCULATION.\n");
+                    fwrite($hook_file, "ERROR: " . $err);
+                    fclose($hook_file);
+					
+                } else {
+                    if($response){
 
-                    foreach ($zamp_resp->taxes ?? [] as $taxi) {
-                        if ($taxi->lineItemId === $line->id) {
-                            $line_tax += $taxi->taxDue;
-                            $line_rate += $taxi->taxRate;
+                        // Create a new DateTime object
+                        $dateTime = new DateTime('now', $timezone);
+                
+                        // Format the date and time as needed
+                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+
+                        // Split the response into headers and body
+                        $responseParts = explode("\r\n\r\n", $response, 2);
+                        $httpResponseHeaders = isset($responseParts[0]) ? $responseParts[0] : '';
+                        $jsonResponseBody = isset($responseParts[1]) ? $responseParts[1] : '';
+
+						$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+						fwrite($hook_file, "\n\n");
+						fwrite($hook_file, $formattedTime . " - INITIAL RESPONSE FROM ZAMP CALCULATION - " . strtok($httpResponseHeaders, "\r\n") . "\n");
+                        fwrite($hook_file, "RESPONSE: " . json_encode(json_decode($jsonResponseBody), JSON_PRETTY_PRINT));
+						fclose($hook_file);	
+
+                        $zamp_resp = json_decode($jsonResponseBody);
+    
+                        foreach($zamp_resp->lineItems as $line){
+                            $line_tax = 0.00;
+                            $line_rate = 0.0;
+    
+                            foreach($zamp_resp->taxes as $key => $taxi){
+                                if($taxi->lineItemId == $line->id){
+                                    $line_tax += $taxi->taxDue;
+                                    $line_rate += $taxi->taxRate;
+                                }
+                            }
+    
+                            $taxRate = (float) number_format($line_rate, 6, '.', '');
+                            $price = (float) number_format($line->amount * $line->quantity, 2, '.', '');
+                            $taxes = (float) number_format($line_tax, 2, '.', '');
+    
+                            // shopware will look for the `uniqueIdentifier` property of the lineItem to identify this lineItem even in nested-line-item structures
+                            $lineItemTaxes[$item->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                                [
+                                    new CalculatedTax($taxes, $taxRate, $price),
+                                ]
+                            );
+
+                            // shopware will look for the `uniqueIdentifier` property of the lineItem to identify this lineItem even in nested-line-item structures
+                            $cartPriceTaxes[$item->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                                [
+                                    new CalculatedTax($taxes, $taxRate, $price),
+                                ]
+							);
+    
                         }
+
+                        // Create a new DateTime object
+                        $dateTime = new DateTime('now', $timezone);
+                        
+                        // Format the date and time as needed
+                        $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
+
+						$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+						fwrite($hook_file, "\n\n");
+						fwrite($hook_file, $formattedTime . " - CART PRICE TAXES GENERATED WITH ZAMP CALCULATION. \n");
+                        fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
+						fclose($hook_file);	
                     }
+                }    
+                    
+            } else {
+                foreach ($cart->getLineItems() as $lineItem) {
+                
+                    $taxRate = 0;
+                    $price = $lineItem->getPrice()->getTotalPrice();
+                    $taxes = 0;
+        
+                    // shopware will look for the `uniqueIdentifier` property of the lineItem to identify this lineItem even in nested-line-item structures
+                    $lineItemTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                        [
+                            new CalculatedTax($taxes, $taxRate, $price),
+                        ]
+                    );
+        
+                    $cartPriceTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                        [
+                            new CalculatedTax($taxes, $taxRate, $price),
+                        ]
+                    );
 
-                    $taxRate = (float) number_format($line_rate, 6, '.', '');
-                    $price = (float) number_format($line->amount * $line->quantity, 2, '.', '');
-                    $taxes = (float) number_format($line_tax, 2, '.', '');
-
-                    $taxCollection = new CalculatedTaxCollection([new CalculatedTax($taxes, $taxRate, $price)]);
-                    $lineItemTaxes[$line->id] = $taxCollection;
-                    $cartPriceTaxes[$line->id] = $taxCollection;
+                    // $lineItemTaxes[$lineItem->getUniqueIdentifier()] = new CalculatedTaxCollection(
+                    //     [
+                    //         new CalculatedTax($taxes, $taxRate, $price),
+                    //     ]
+                    // );
                 }
 
-                $this->logger->info("ZampTax taxes calculated", [
-                    'time' => $formattedTime,
-                    'cartTaxes' => $cartPriceTaxes,
-                ]);
-            }
-        } else {
-            foreach ($cart->getLineItems() as $lineItem) {
-                $price = $lineItem->getPrice()->getTotalPrice();
-                $taxRate = 0;
-                $taxes = 0;
+                // Create a new DateTime object
+                $dateTime = new DateTime('now', $timezone);
+                
+                // Format the date and time as needed
+                $formattedTime = $dateTime->format('H:i:s'); // e.g., "10:00:00"
 
-                $collection = new CalculatedTaxCollection([new CalculatedTax($taxes, $taxRate, $price)]);
-                $lineItemTaxes[$lineItem->getUniqueIdentifier()] = $collection;
-                $cartPriceTaxes[$lineItem->getUniqueIdentifier()] = $collection;
+				$hook_file = fopen(date('Y-m-d') . "_log.txt", "a+");
+				fwrite($hook_file, "\n\n");
+				fwrite($hook_file, $formattedTime . " - CART PRICE TAXES GENERATED WITH NON-TAXABLE ZAMP CALCULATION.\n");
+                fwrite($hook_file, "CART PRICE TAXES: " . json_encode($cartPriceTaxes, JSON_PRETTY_PRINT));
+				fclose($hook_file);
             }
-
-            $this->logger->info("ZampTax: no calculation due to non-taxable state", [
-                'time' => $formattedTime,
-                'cartTaxes' => $cartPriceTaxes,
-            ]);
         }
-
-        return new TaxProviderResult($lineItemTaxes, $cartPriceTaxes);
+        
+       
+        return new TaxProviderResult(
+            $lineItemTaxes,
+            // $deliveryTaxes,
+            $cartPriceTaxes
+        );
     }
 }
