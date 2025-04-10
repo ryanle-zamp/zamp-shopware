@@ -35,14 +35,12 @@ Component.override('sw-settings-customer-group-detail', {
 
 			this.customerGroup.customFields = customFields;
 	
-			console.log('Customer Group Tax Exempt Code: ', this.customerGroup.taxExemptCode);
 			var cgId = this.customerGroup.id;
 	
 			this.customerGroupRepository.save(this.customerGroup).then(() => {
 				return this.customerGroupRepository.get(cgId, Shopware.Context.api);
 			}).then(entity => {
 				this.customerGroup = entity;
-				console.log("Entity: ", JSON.stringify(this.customerGroup));
 			}).catch(error => {
 				console.error("Failed to save customer group: ", error);
 				if (error.response && error.response.data) {
@@ -144,13 +142,8 @@ Component.override('sw-product-detail', {
             this.$super('onSave').then(() => {
                 const zampProductId = this.product.id;
 
-                console.log("Product ID: ", zampProductId);
-
                 const zampProductTaxCode = document.querySelector('#zamp-product-tax-code-input .sw-block-field__block input').value;
 
-                console.log("Zamp Product Tax Code: ", zampProductTaxCode);
-
-                
                 if (zampProductId && zampProductTaxCode) {
 
                     const criteria = new Shopware.Data.Criteria();
@@ -202,9 +195,7 @@ Component.override('sw-product-detail', {
                             message: 'Failed to save or update Zamp Product Tax Code: ' + err.message,
                         });
                     });
-                } else {
-                    console.error('Product ID or Zamp Tax Code is missing.');
-                }
+                } 
             }).catch(error => {
                 console.error('Failed to save product:', error);
                 this.createNotificationError({
