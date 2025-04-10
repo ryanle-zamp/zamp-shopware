@@ -143,8 +143,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 				this.entity.id = randomHexUuid;
 
 				this.entityId = randomHexUuid;
-
-				console.log(this.entity.id);
 	
 				this.zampSettingsRepository.save(this.entity, Shopware.Context.api);
 			}
@@ -162,8 +160,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 				this.$nextTick(() => {
 					const apiForm = document.getElementById('zamp-token-form');
 					const settingsForm = document.getElementById('zamp-settings-form');
-
-					console.log(apiForm);
 
 					if(apiForm){
 						apiForm.addEventListener('submit', (e) => {
@@ -214,8 +210,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 							this.entity.id = randomHexUuid;
 
 							this.entityId = randomHexUuid;
-
-							console.log(this.entity.id);
 				
 							this.zampSettingsRepository.save(this.entity, Shopware.Context.api);
 						}
@@ -421,7 +415,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 	
 					if(this.entity.apiToken !== null){
 						token = this.entity.apiToken;
-						console.log("Token is: ", token);
 					}
 
                     const paidCrit = new Shopware.Data.Criteria();
@@ -445,8 +438,6 @@ Shopware.Component.register('zamp-tax-main-page', {
                                             this.paidOrders.push(sul.orderId);
                                         }
                                     });
-
-                                    console.log("Paid Orders: ", this.paidOrders);
                                 }
                             });
 
@@ -503,16 +494,13 @@ Shopware.Component.register('zamp-tax-main-page', {
     					const recentOrders = Object.values(uniqueOrders);
 
 						const filteredOrders = recentOrders.filter(ord => {
-							console.log("Raw Order: ", ord);  // Log the raw created_at value
 							const createdAt = new Date(ord.createdAt);
 							const startDate = new Date(start);
 							const endDate = new Date(end);
-							console.log(`Order ID: ${ord.id}, Created At: ${createdAt}, In Range: ${createdAt >= startDate && createdAt <= endDate}`);
 							return createdAt >= startDate && createdAt <= endDate;
 						});
 
 						this.orders = filteredOrders;
-						console.log('Filtered Orders: ', this.orders);
 
 						this.totalSyncRequested = this.orders.length;
 
@@ -538,7 +526,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 								} else if (resp.status == "failed"){
 									this.totalSyncFailed += 1;
 								}
-								console.log(resp);
 							})
 
 						});
@@ -616,7 +603,6 @@ Shopware.Component.register('zamp-tax-main-page', {
                 // Clear the existing list items except the last input element
                 list.innerHTML = '';
                 this.selectedStates.forEach(state => {
-					console.log(state.code);
                     const listItem = document.createElement('li');
                     listItem.className = 'sw-select-selection-list__item-holder';
                     listItem.dataset.id = state.code; // Assuming code is unique
@@ -639,18 +625,6 @@ Shopware.Component.register('zamp-tax-main-page', {
                     removeButton.className = 'sw-label__dismiss';
                     removeButton.title = 'Remove';
 					removeButton.setAttribute("data-state", state.code);
-
-					// Log the button creation and data attribute to verify
-            		console.log('Button created for state:', state.code, 'Data attribute:', removeButton.getAttribute("data-state"));
-
-					// // Add event listener to remove button
-					// removeButton.addEventListener('click', () => {
-					// 	console.log("Clicked");
-					// 	// Remove state from selectedStates array
-					// 	this.selectedStates.splice(this.selectedStates.indexOf(state), 1);
-		
-					// 	list.removeChild(listItem);								
-					// });
 
                     const iconSpan = document.createElement('span');
                     iconSpan.className = 'sw-icon sw-icon--fill icon--regular-times-s';
@@ -747,7 +721,6 @@ Shopware.Component.register('zamp-tax-main-page', {
 									
 									let stateCode = so.querySelector('div.sw-highlight-text').innerText.split(' - ')[0];
 									if(!this.selectedStates.includes(stateCode)){
-										console.log(this.selectedStates);
 										this.selectedStates.push(stateCode);
 									}									
 								});
