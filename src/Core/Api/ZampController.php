@@ -58,16 +58,20 @@ class ZampController extends AbstractController
      * 
      * @return JsonResponse Response indicating if the token is valid
      */
-	#[Route('/api/v1/_action/zamp-tax/test-api', name: 'api.zamp_tax.test_api', methods: ["POST", "GET"])]
+	#[Route('/api/v1/_action/zamp-tax/test-api', name: 'api.zamp_tax.test_api', methods: ["POST"])]
 	public function testApiToken(Request $request): JsonResponse
 	{
         $timezone = new DateTimeZone('UTC');
 
-		$token = trim($request->get('token', ''));
+		$content = $request->getContent();
+		$this->logger->info('ZAMP RAW POST BODY', ['body' => $content]);
+
+		$data = json_decode($request->getContent(), true);
+		$token = trim($data['token'] ?? '');
+
 		if (!preg_match('/^[A-Za-z0-9\-_.]+$/', $token)) {
 			return new JsonResponse(['valid' => false, 'message' => 'Invalid token format'], 400);
 		}
-
 
 		$valid = "";
 

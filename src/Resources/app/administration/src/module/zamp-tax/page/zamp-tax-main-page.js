@@ -547,40 +547,51 @@ Shopware.Component.register('zamp-tax-main-page', {
 
 			
 		},
+
 		testToken(e) {
-			const bearerToken = Shopware.Context.api.authToken.access;
-
 			e.preventDefault();
-			var token = document.querySelector('#zamp-token-input').value;
-
-			var formData = new FormData();
-			formData.append('token', token);
-
+		
+			const bearerToken = Shopware.Context.api.authToken.access;
+			const token = document.querySelector('#zamp-token-input').value.trim();
 			const baseUrl = Shopware.Context.api.apiPath;
-
-			fetch(`${baseUrl}/v1/_action/zamp-tax/test-api`, { headers: { Authorization: `Bearer ${bearerToken}`}, method: "POST", body: formData }).then(r => {
+		
+			fetch(`${baseUrl}/v1/_action/zamp-tax/test-api`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${bearerToken}`,
+					'Content-Type': 'application/json',
+					'X-Requested-With': 'XMLHttpRequest'
+				},
+				body: JSON.stringify({ token })
+			})
+			.then(async (r) => {
+				if (!r.ok) {
+					const errorText = await r.text();
+					console.error('Bad response:', r.status, errorText);
+					throw new Error(`HTTP ${r.status}`);
+				}
 				return r.json();
-			}).then(resp => {
-				if(resp.valid){
-					this.createNotificationSuccess({
-						title: this.$tc('global.default.success'),
-						message: this.$tc('messages.successtoken')
-					});
+			})
+			.then(resp => {
+				if (resp.valid) {
 					this.entity.apiToken = token;
-					this.connected = true;
-
-					this.zampSettingsRepository.save(this.entity, Shopware.Context.api)
-					.then(() => {
-						// the entity is stateless, the data has be fetched from the server, if required
-						this.zampSettingsRepository
-							.get(this.entityId, Shopware.Context.api)
-							.then(entity => {
-								this.entity = entity;
+		
+					this.zampSettingsRepository.get(this.entityId, Shopware.Context.api).then(entity => {
+						this.entity = entity;
+						this.entity.apiToken = token;
+					
+						this.zampSettingsRepository.save(this.entity, Shopware.Context.api).then(() => {
+							// optional refresh again if needed
+							this.createNotificationSuccess({
+								title: this.$tc('global.default.success'),
+								message: this.$tc('messages.successtoken')
 							});
+					
+							this.connected = true;
+							document.querySelector('#zamp-token-input').value = this.entity.apiToken;
+							document.querySelector('#small-disclaimer-text')?.classList.add('green-text');
+						});
 					});
-					document.querySelector('#zamp-token-input').value = this.entity.apiToken;
-					document.querySelector('#small-disclaimer-text').classList.add('green-text');
-					this.connected = true;
 				} else {
 					this.createNotificationError({
 						title: this.$tc('global.notification.unspecifiedSaveErrorMessage'),
@@ -588,11 +599,19 @@ Shopware.Component.register('zamp-tax-main-page', {
 					});
 					this.connected = false;
 				}
+			})
+			.catch(err => {
+				console.error('Token check failed:', err);
+		
+				this.createNotificationError({
+					title: this.$tc('global.notification.unspecifiedSaveErrorMessage'),
+					message: this.$tc('messages.failtoken')
+				});
+		
+				this.connected = false;
 			});
-
-			
-			
 		},
+		
 
         updateSelectedStates() {
             const list = document.querySelector('.sw-select-selection-list__input');
